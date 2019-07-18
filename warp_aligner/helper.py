@@ -1,5 +1,8 @@
 import numpy as np
 import numba as nb
+import prody as pd
+import typing
+from pathlib import Path
 
 
 def aligned_string_to_array(aln: str) -> np.ndarray:
@@ -68,3 +71,37 @@ def get_aligned_coordinates(aln_array: np.ndarray, coords, gap=-1):
     aln_coords[:] = np.nan
     aln_coords[pos] = coords
     return aln_coords
+
+
+def get_file_parts(input_filename: typing.Union[str, Path]) -> tuple:
+    """
+    Gets directory path, name, and extension from a filename
+    Parameters
+    ----------
+    input_filename
+
+    Returns
+    -------
+    (path, name, extension)
+    """
+    input_filename = Path(input_filename)
+    path = str(input_filename.parent)
+    extension = input_filename.suffix
+    name = input_filename.stem
+    return path, name, extension
+
+
+def get_alpha_indices(protein):
+    """
+    Get indices of alpha carbons of pd AtomGroup object
+    """
+    return [a.getIndex() for a in protein.iterAtoms() if a.getName() == 'CA']
+
+
+def get_beta_indices(protein: pd.AtomGroup) -> list:
+    """
+    Get indices of beta carbons of pd AtomGroup object
+    (alpha if Gly)
+    """
+    return [a.getIndex() for a in protein.iterAtoms() if
+            (a.getResname() != 'GLY' and a.getName() == 'CB') or (a.getResname() == 'GLY' and a.getName() == 'CA')]
