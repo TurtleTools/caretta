@@ -1,5 +1,6 @@
 import numpy as np
 import numba as nb
+import typing
 from warp_aligner import dynamic_time_warping as dtw
 from warp_aligner import rmsd_calculations, helper
 
@@ -16,7 +17,7 @@ class RMSD:
 
 
 class Structure:
-    def __init__(self, name: str, sequence: str, coords: np.ndarray):
+    def __init__(self, name: str, sequence: typing.Union[str, None], coords: np.ndarray):
         self.name = name
         self.sequence = sequence
         self.coords = coords
@@ -27,7 +28,7 @@ class StructurePair:
         self.structure_1 = structure_1
         self.structure_2 = structure_2
 
-    def get_common_coordinates(self, aln_sequence_1: np.ndarray, aln_sequence_2: np.ndarray, gap=-1):
+    def get_common_coordinates(self, aln_sequence_1: typing.Union[str, np.ndarray], aln_sequence_2: typing.Union[str, np.ndarray], gap=-1):
         """
         Gets coordinates according to an alignment where neither position is a gap
 
@@ -36,7 +37,7 @@ class StructurePair:
         aln_sequence_1
         aln_sequence_2
         gap
-            character representing gaps
+            character representing gaps (-1 for array, '-' for string)
 
         Returns
         -------
@@ -56,10 +57,11 @@ class StructurePair:
         Parameters
         ----------
         aln_array_1
-            aligned indices of first protein (gap=-1)
+            aligned indices of first protein
         aln_array_2
-            aligned indices of second protein (gap=-1)
+            aligned indices of second protein
         gap
+            gap character (-1 if array, '-' if string)
 
         Returns
         -------
