@@ -3,6 +3,7 @@ import numba as nb
 import prody as pd
 import typing
 from pathlib import Path
+import subprocess
 
 
 def aligned_string_to_array(aln: str) -> np.ndarray:
@@ -105,3 +106,101 @@ def get_beta_indices(protein: pd.AtomGroup) -> list:
     """
     return [a.getIndex() for a in protein.iterAtoms() if
             (a.getResname() != 'GLY' and a.getName() == 'CB') or (a.getResname() == 'GLY' and a.getName() == 'CA')]
+
+
+def clustal_msa_from_sequences(sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None):
+    """
+    Align sequences optionally using hmm_file as a guide
+
+    Parameters
+    ----------
+    sequence_file
+    alignment_file
+    hmm_file
+    distance_matrix_file
+        Writes pairwise distance matrix into file if not None
+
+    Returns
+    -------
+
+    """
+    if hmm_file is not None:
+        if distance_matrix_file is None:
+            subprocess.check_call(f"clustalo "
+                                  f"--output-order=input-order "
+                                  f"--log=log_clustal.out "
+                                  f"-i {sequence_file} "
+                                  f"--hmm-in={hmm_file} "
+                                  f"-o {alignment_file} "
+                                  f"--threads=10 --force -v", shell=True)
+        else:
+            subprocess.check_call(
+                f"clustalo "
+                f"--output-order=input-order "
+                f"--log=log_clustal.out --full "
+                f"--distmat-out={distance_matrix_file} "
+                f"-i {sequence_file} "
+                f"--hmm-in={hmm_file} "
+                f"-o {alignment_file} "
+                f"--threads=10 --force -v",
+                shell=True)
+    else:
+        if distance_matrix_file is None:
+            subprocess.check_call(
+                f"clustalo "
+                f"--output-order=input-order "
+                f"--log=log_clustal.out "
+                f"-i {sequence_file} "
+                f"-o {alignment_file} "
+                f"--threads=10 --force -v",
+                shell=True)
+        else:
+            subprocess.check_call(
+                f"clustalo "
+                f"--output-order=input-order "
+                f"--log=log_clustal.out "
+                f"--full "
+                f"--distmat-out={distance_matrix_file} "
+                f"-i {sequence_file} "
+                f"-o {alignment_file} "
+                f"--threads=10 --force -v",
+                shell=True)
+
+
+def get_sequences_from_fasta(fasta_file: typing.Union[str, Path], prune_headers: bool = True) -> dict:
+    """
+    Returns dict of accession to sequence from fasta file
+    Parameters
+    ----------
+    fasta_file
+    prune_headers
+        only keeps accession upto first /
+
+    Returns
+    -------
+    {accession:sequence}
+    """
+    sequences = {}
+    with open(fasta_file) as f:
+        current_sequence = []
+        current_key = None
+        for line in f:
+            if not len(line.strip()):
+                continue
+            if line.startswith('>'):
+                if current_key is None:
+                    if "/" in line and prune_headers:
+                        current_key = line.split(">")[1].split("/")[0].strip()
+                    else:
+                        current_key = line.split(">")[1].strip()
+                else:
+                    sequences[current_key] = ''.join(current_sequence)
+                    current_sequence = []
+                    if "/" in line and prune_headers:
+                        current_key = line.split(">")[1].split("/")[0].strip()
+                    else:
+                        current_key = line.split(">")[1].strip()
+            else:
+                current_sequence.append(line.strip())
+        sequences[current_key] = ''.join(current_sequence)
+    return sequences

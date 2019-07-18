@@ -37,7 +37,7 @@ class StructureMultiple:
         self.tree = None
         self.branch_lengths = None
 
-    def make_pairwise_rmsd_matrix(self, alignments: dict, gap_open_penalty: float, gap_extend_penalty: float, run_dtw=True):
+    def make_pairwise_rmsd_matrix(self, alignments: dict, run_dtw: bool = False, gap_open_penalty: float = 0., gap_extend_penalty: float = 0.):
         """
         Find RMSDs of pairwise alignment of each pair of sequences
 
@@ -45,12 +45,12 @@ class StructureMultiple:
         ----------
         alignments
             initial alignments
+        run_dtw
+            if True then re-aligns using DTW and gap penalties
         gap_open_penalty
             penalty for opening a (series of) gap(s)
         gap_extend_penalty
             penalty for extending an existing series of gaps
-        run_dtw
-            if True then re-aligns using DTW
 
         Returns
         -------
