@@ -6,6 +6,14 @@ import prody as pd
 from caretta import helper
 
 
+# TODO: Use multiprocessing to parallelize extraction of features for many proteins:
+#     with multiprocessing.Pool(processes=num_main_threads) as pool:
+#         pool.starmap(get_dssp_features,
+#                      [(protein, pdb_file, dssp_dir)
+#                       for (protein, pdb_file) in list_of_proteins])
+#     use just pool.map for the others since it's single input
+
+
 def get_anm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
     """
     Get atom fluctuations using an Anisotropic network model with n_modes modes.
