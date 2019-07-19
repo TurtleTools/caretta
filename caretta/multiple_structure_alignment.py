@@ -71,7 +71,13 @@ class StructureMultiple:
                                                                             gap_extend_penalty=gap_extend_penalty)
                     rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
                 else:
-                    rmsd_class = structure_pair.get_rmsd_coverage(alignments[name_1], alignments[name_2], gap='-')
+                    if isinstance(alignments[name_1], str):
+                        aln_1 = helper.aligned_string_to_array(alignments[name_1])
+                        aln_2 = helper.aligned_string_to_array(alignments[name_2])
+                    else:
+                        aln_1 = alignments[name_1]
+                        aln_2 = alignments[name_2]
+                    rmsd_class = structure_pair.get_rmsd_coverage(aln_1, aln_2)
                 pairwise_matrix[i, j] = rmsd_class.rmsd
                 pairwise_coverage[i, j] = rmsd_class.coverage_aln
         return pairwise_matrix, pairwise_coverage
@@ -137,7 +143,8 @@ class StructureMultiple:
         alignments = {k: helper.aligned_string_to_array(alignments[k]) for k in alignments}
         pw_matrix, _ = self.make_pairwise_rmsd_matrix(alignments,
                                                       gap_open_penalty=gap_open_penalty,
-                                                      gap_extend_penalty=gap_extend_penalty)
+                                                      gap_extend_penalty=gap_extend_penalty,
+                                                      run_dtw=True)
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         msa_alignments = {}
         self.tree = tree

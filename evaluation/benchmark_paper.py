@@ -6,6 +6,7 @@ import prody as pd
 
 from caretta import helper
 from caretta import multiple_structure_alignment as msa
+from caretta import pairwise_structure_alignment as psa
 
 
 def get_pdbs(pdb_dir) -> dict:
@@ -68,23 +69,23 @@ def get_sequence_alignment(sequences: typing.Dict[str, str], directory, name="re
     return helper.get_sequences_from_fasta(aln_sequence_file)
 
 
-def get_msa_class(pdb_dir) -> msa.StructureMultiple:
+def get_structures(pdb_dir) -> typing.List[psa.Structure]:
     """
-    Get msa_class (msa.StructureMultiple) from the PDB files in a directory.
+    Get list of Structure objects from a directory of PDB files
     """
     pdbs = get_pdbs(pdb_dir)
     names = list(pdbs.keys())
     sequences = get_sequences(pdbs)
     coordinates = [pdbs[n][helper.get_beta_indices(pdbs[n])].getCoords().astype(np.float64) for n in names]
     structures = msa.make_structures(names, [sequences[n] for n in names], coordinates)
-    structures_multiple = msa.StructureMultiple(structures)
-    return structures_multiple
+    return structures
 
 
 def get_msa(pdb_dir, sequence_dir, name="ref", gap_open_penalty: float = 0., gap_extend_penalty: float = 0.):
     """
     Example usage of above functions to make a structure-guided multiple sequence alignment from a directory of PDB files
     """
-    msa_class = get_msa_class(pdb_dir)
+    structures = get_structures(pdb_dir)
+    msa_class = msa.StructureMultiple(structures)
     aln_sequences = get_sequence_alignment({s.name: s.sequence for s in msa_class.structures}, sequence_dir, name)
     return msa_class.align(aln_sequences, gap_open_penalty, gap_extend_penalty)

@@ -29,14 +29,14 @@ class StructurePair:
         self.structure_1 = structure_1
         self.structure_2 = structure_2
 
-    def get_common_coordinates(self, aln_sequence_1: typing.Union[str, np.ndarray], aln_sequence_2: typing.Union[str, np.ndarray], gap=-1):
+    def get_common_coordinates(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap=-1):
         """
         Gets coordinates according to an alignment where neither position is a gap
 
         Parameters
         ----------
-        aln_sequence_1
-        aln_sequence_2
+        aln_array_1
+        aln_array_2
         gap
             character representing gaps (-1 for array, '-' for string)
 
@@ -44,8 +44,8 @@ class StructurePair:
         -------
         common_coords_1, common_coords_2
         """
-        assert len(aln_sequence_1) == len(aln_sequence_2)
-        pos_1, pos_2 = helper.get_common_positions(aln_sequence_1, aln_sequence_2, gap)
+        assert aln_array_1.shape == aln_array_2.shape
+        pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2, gap)
         return self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
 
     def get_rmsd_coverage(self, aln_array_1, aln_array_2, gap=-1) -> RMSD:
@@ -98,7 +98,7 @@ class StructurePair:
         pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2)
         common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
         rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
-        coords_2 = rmsd_calculations.apply_rotran(self.structure_2.coords[pos_2], rotation_matrix, translation_matrix)
-        distance_matrix = rmsd_calculations.make_euclidean_matrix(self.structure_1.coords[pos_1], coords_2)
+        coords_2 = rmsd_calculations.apply_rotran(self.structure_2.coords, rotation_matrix, translation_matrix)
+        distance_matrix = rmsd_calculations.make_euclidean_matrix(self.structure_1.coords, coords_2)
         dtw_aln_array_1, dtw_aln_array_2 = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         return dtw_aln_array_1, dtw_aln_array_2

@@ -3,6 +3,17 @@ import numpy as np
 
 
 @nb.njit
+def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
+    """
+    Same as np.mean(array, axis=0) but njitted
+    """
+    mean_array = np.zeros(array.shape[1])
+    for i in range(array.shape[1]):
+        mean_array[i] = np.mean(array[:, i])
+    return mean_array
+
+
+@nb.njit
 def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
     """
     Superimpose paired coordinates on each other using svd
@@ -18,16 +29,6 @@ def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
     -------
     rotation matrix, translation matrix for optimal superposition
     """
-
-    def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
-        """
-        Same as np.mean(array, axis=0) but njitted
-        """
-        mean_array = np.zeros(array.shape[1])
-        for i in range(array.shape[1]):
-            mean_array[i] = np.mean(array[:, i])
-        return mean_array
-
     centroid_1, centroid_2 = nb_mean_axis_0(coords_1), nb_mean_axis_0(coords_2)
     coords_1_c, coords_2_c = coords_1 - centroid_1, coords_2 - centroid_2
     correlation_matrix = np.dot(coords_2_c.T, coords_1_c)
