@@ -1,9 +1,11 @@
-from warp_aligner import multiple_structure_alignment as msa
-from warp_aligner import helper
-from pathlib import Path
-import prody as pd
-import numpy as np
 import typing
+from pathlib import Path
+
+import numpy as np
+import prody as pd
+
+from caretta import helper
+from caretta import multiple_structure_alignment as msa
 
 
 def get_pdbs(pdb_dir) -> dict:
