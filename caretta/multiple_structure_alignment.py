@@ -1,9 +1,11 @@
-from warp_aligner import neighbor_joining as nj
-from warp_aligner import rmsd_calculations, helper
-from warp_aligner import pairwise_structure_alignment as psa
-import numpy as np
-import numba as nb
 import typing
+
+import numba as nb
+import numpy as np
+
+from caretta import neighbor_joining as nj
+from caretta import pairwise_structure_alignment as psa
+from caretta import rmsd_calculations, helper
 
 
 @nb.njit

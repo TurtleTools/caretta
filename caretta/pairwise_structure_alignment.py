@@ -1,8 +1,9 @@
-import numpy as np
-import numba as nb
 import typing
-from warp_aligner import dynamic_time_warping as dtw
-from warp_aligner import rmsd_calculations, helper
+
+import numpy as np
+
+from caretta import dynamic_time_warping as dtw
+from caretta import rmsd_calculations, helper
 
 
 class RMSD:

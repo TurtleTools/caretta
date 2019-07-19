@@ -1,9 +1,10 @@
-import numpy as np
-import numba as nb
-import prody as pd
+import subprocess
 import typing
 from pathlib import Path
-import subprocess
+
+import numba as nb
+import numpy as np
+import prody as pd
 
 
 def aligned_string_to_array(aln: str) -> np.ndarray:

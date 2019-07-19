@@ -1,7 +1,9 @@
-import prody as pd
-import numpy as np
 from pathlib import Path
-from warp_aligner import helper
+
+import numpy as np
+import prody as pd
+
+from caretta import helper
 
 
 def get_anm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):

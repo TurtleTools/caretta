@@ -1,5 +1,5 @@
-import numpy as np
 import numba as nb
+import numpy as np
 
 
 # Neighbor joining takes as input a distance matrix specifying the distance between each pair of taxa.
