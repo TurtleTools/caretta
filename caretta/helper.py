@@ -50,7 +50,7 @@ def get_common_positions(aln_sequence_1: np.ndarray, aln_sequence_2: np.ndarray,
     return pos_1, pos_2
 
 
-def get_aligned_coordinates(aln_array: np.ndarray, coords, gap=-1):
+def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
     """
     Fills coordinates according to an alignment
     gaps (-1) in the sequence correspond to NaNs in the aligned coordinates
@@ -59,8 +59,8 @@ def get_aligned_coordinates(aln_array: np.ndarray, coords, gap=-1):
     ----------
     aln_array
         sequence (with gaps)
-    coords
-        coordinates of atoms corresponding to alignment with NaNs in gap positions
+    data
+        data to align
     gap
         character that represents gaps
     Returns
@@ -68,10 +68,10 @@ def get_aligned_coordinates(aln_array: np.ndarray, coords, gap=-1):
     aligned coordinates
     """
     pos = [i for i in range(len(aln_array)) if aln_array[i] != gap]
-    assert len(pos) == coords.shape[0]
+    assert len(pos) == data.shape[0]
     aln_coords = np.zeros((len(aln_array), 3))
     aln_coords[:] = np.nan
-    aln_coords[pos] = coords
+    aln_coords[pos] = data
     return aln_coords
 
 

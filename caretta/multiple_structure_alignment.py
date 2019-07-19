@@ -110,8 +110,8 @@ class StructureMultiple:
         common_coords_1, common_coords_2 = structure_pair.get_common_coordinates(dtw_aln_1, dtw_aln_2)
         rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
         coords_2 = rmsd_calculations.apply_rotran(structure_pair.structure_2.coords, rot, tran)
-        aln_coords_1 = helper.get_aligned_coordinates(dtw_aln_1, structure_pair.structure_1.coords, -1)
-        aln_coords_2 = helper.get_aligned_coordinates(dtw_aln_2, coords_2, -1)
+        aln_coords_1 = helper.get_aligned_data(dtw_aln_1, structure_pair.structure_1.coords, -1)
+        aln_coords_2 = helper.get_aligned_data(dtw_aln_2, coords_2, -1)
         return aln_coords_1, aln_coords_2, dtw_aln_1, dtw_aln_2
 
     def align(self, alignments: dict, gap_open_penalty: float = 0., gap_extend_penalty: float = 0) -> dict:
