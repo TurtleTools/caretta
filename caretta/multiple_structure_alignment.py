@@ -24,7 +24,7 @@ def get_mean_coords(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) -> np.nd
     """
     mean_coords = np.zeros(aln_coords_1.shape)
     for i in range(aln_coords_1.shape[0]):
-        mean_coords[i] = np.array([np.nanmean(np.array([aln_coords_1[i, x], aln_coords_2[i, x]])) for x in range(3)])
+        mean_coords[i] = np.array([np.nanmean(np.array([aln_coords_1[i, x], aln_coords_2[i, x]])) for x in range(aln_coords_1.shape[1])])
     return mean_coords
 
 
@@ -39,7 +39,8 @@ class StructureMultiple:
         self.tree = None
         self.branch_lengths = None
 
-    def make_pairwise_rmsd_matrix(self, alignments: dict, run_dtw: bool = False, gap_open_penalty: float = 0., gap_extend_penalty: float = 0.):
+    def make_pairwise_rmsd_matrix(self, alignments: dict, run_dtw: bool = False, superimpose: bool = True, gap_open_penalty: float = 0.,
+                                  gap_extend_penalty: float = 0.):
         """
         Find RMSDs of pairwise alignment of each pair of sequences
 
@@ -49,6 +50,8 @@ class StructureMultiple:
             initial alignments
         run_dtw
             if True then re-aligns using DTW and gap penalties
+        superimpose
+            if True then superimposes data using alignments before running DTW
         gap_open_penalty
             penalty for opening a (series of) gap(s)
         gap_extend_penalty
@@ -67,6 +70,7 @@ class StructureMultiple:
                 structure_pair = psa.StructurePair(self.structures[i], self.structures[j])
                 if run_dtw:
                     dtw_aln_1, dtw_aln_2 = structure_pair.get_dtw_alignment(alignments[name_1], alignments[name_2],
+                                                                            superimpose=superimpose,
                                                                             gap_open_penalty=gap_open_penalty,
                                                                             gap_extend_penalty=gap_extend_penalty)
                     rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
@@ -120,7 +124,7 @@ class StructureMultiple:
         aln_coords_2 = helper.get_aligned_data(dtw_aln_2, coords_2, -1)
         return aln_coords_1, aln_coords_2, dtw_aln_1, dtw_aln_2
 
-    def align(self, alignments: dict, gap_open_penalty: float = 0., gap_extend_penalty: float = 0) -> dict:
+    def align(self, alignments: dict, gap_open_penalty: float = 0., gap_extend_penalty: float = 0, superimpose: bool = True) -> dict:
         """
         Makes a multiple structure alignment
         TODO: Doesn't work if there's only 3 sequences!
@@ -133,7 +137,8 @@ class StructureMultiple:
             penalty for opening a (series of) gap(s)
         gap_extend_penalty
             penalty for extending an existing series of gaps
-
+        superimpose
+            if True, uses alignments to superimpose data before running DTW
         Returns
         -------
         DTW-based multiple sequence alignment
@@ -144,7 +149,8 @@ class StructureMultiple:
         pw_matrix, _ = self.make_pairwise_rmsd_matrix(alignments,
                                                       gap_open_penalty=gap_open_penalty,
                                                       gap_extend_penalty=gap_extend_penalty,
-                                                      run_dtw=True)
+                                                      run_dtw=True,
+                                                      superimpose=superimpose)
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         msa_alignments = {}
         self.tree = tree

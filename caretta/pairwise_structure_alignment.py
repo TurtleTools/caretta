@@ -75,7 +75,8 @@ class StructurePair:
         rmsd = rmsd_calculations.get_rmsd_superimposed(common_coords_1, common_coords_2)
         return RMSD(rmsd, common_coords_1.shape[0], aln_array_1, aln_array_2, gap=gap)
 
-    def get_dtw_alignment(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty=0.):
+    def get_dtw_alignment(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty=0.,
+                          superimpose: bool = True):
         """
         Aligns two sets of coordinates using dynamic time warping
         aln_array_1 and aln_array_2 are used to find the initial rotation/translation
@@ -90,15 +91,19 @@ class StructurePair:
             penalty for opening a (series of) gap(s)
         gap_extend_penalty
             penalty for extending an existing series of gaps
-
+        superimpose
+            if True, superimposes coords based on aln_array_1 and aln_array_2 before running dtw
         Returns
         -------
         aligned_indices_1, aligned_indices_2
         """
-        pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2)
-        common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
-        rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
-        coords_2 = rmsd_calculations.apply_rotran(self.structure_2.coords, rotation_matrix, translation_matrix)
+        if superimpose:
+            pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2)
+            common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
+            rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
+            coords_2 = rmsd_calculations.apply_rotran(self.structure_2.coords, rotation_matrix, translation_matrix)
+        else:
+            coords_2 = self.structure_2.coords
         distance_matrix = rmsd_calculations.make_euclidean_matrix(self.structure_1.coords, coords_2)
         dtw_aln_array_1, dtw_aln_array_2 = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         return dtw_aln_array_1, dtw_aln_array_2
