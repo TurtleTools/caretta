@@ -12,6 +12,7 @@ from caretta import pairwise_structure_alignment as psa
 def get_pdbs(pdb_dir) -> dict:
     """
     Get all the proteins in a directory as pd AtomGroup objects
+    (Assumes all non-dot files in the directory are PDB files)
 
     Parameters
     ----------
