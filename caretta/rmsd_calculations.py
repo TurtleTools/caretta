@@ -64,7 +64,7 @@ def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_ma
 def make_euclidean_matrix(coords_1: np.ndarray, coords_2: np.ndarray) -> np.ndarray:
     """
     Makes matrix of euclidean distances of each coordinate in coords_1 to each coordinate in coords_2
-
+    TODO: probably faster to do upper triangle += transpose
     Parameters
     ----------
     coords_1
