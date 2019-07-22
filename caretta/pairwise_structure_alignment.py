@@ -65,7 +65,7 @@ class StructurePair:
             gap character (-1 if array, '-' if string)
 
         Returns
-        -------
+        ------- 
         RMSD of paired coordinates,
         coverage of first protein (number of positions used in RMSD calculation / total number of positions),
         coverage of second protein,
