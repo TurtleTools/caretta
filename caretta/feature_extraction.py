@@ -1,10 +1,11 @@
 from pathlib import Path
 
 import numpy as np
+import numba as nb
 import prody as pd
 
 from caretta import helper
-
+import multiprocessing
 
 # TODO: Use multiprocessing to parallelize extraction of features for many proteins:
 #     with multiprocessing.Pool(processes=num_main_threads) as pool:
@@ -28,6 +29,11 @@ def get_gnm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
     """
     protein_gnm, _ = pd.calcGNM(protein, n_modes=n_modes, selstr='all')
     return pd.calcSqFlucts(protein_gnm)
+
+
+def get_dssp_features_multiple(proteins, pdb_files, dssp_dir, num_threads=20):
+    with multiprocessing.Pool(processes=num_threads) as pool:
+        return pool.starmap(get_dssp_features, [(protein, pdb_file, dssp_dir) for (protein, pdb_file) in zip(proteins, pdb_files)])
 
 
 def get_dssp_features(protein: pd.AtomGroup, pdb_file: str, dssp_dir: str):
@@ -79,4 +85,14 @@ def get_dssp_features(protein: pd.AtomGroup, pdb_file: str, dssp_dir: str):
     for label in dssp_labels:
         label_to_index = {i - 1: protein[x].getData(label) for i, x in zip(indices, alpha_indices)}
         data[f"{label}"] = np.array([label_to_index[i] if i in label_to_index else 0 for i in range(len(alpha_indices))])
+    data["secondary"] = protein.getData("secondary")[alpha_indices]
     return data
+
+
+@nb.njit
+def get_distances(coordinates: np.ndarray, num_neighbors=3):
+    distances = np.zeros((coordinates.shape[0], num_neighbors), dtype=np.float64)
+    for i in range(coordinates.shape[0]):
+        for j in range(1, num_neighbors+1):
+            distances[i, j] = np.sum(np.abs(coordinates[i] - coordinates[i-j]), axis=-1)
+    return distances

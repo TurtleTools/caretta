@@ -155,7 +155,9 @@ class StructureMultiple:
         msa_alignments = {}
         self.tree = tree
         self.branch_lengths = branch_lengths
+        print(tree.shape)
         for x in range(0, tree.shape[0] - 1, 2):
+            print(x)
             node_1, node_2, node_int = tree[x, 0], tree[x + 1, 0], tree[x, 1]
             assert tree[x + 1, 1] == node_int
             name_1, name_2 = self.structures[node_1].name, self.structures[node_2].name

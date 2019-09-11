@@ -78,7 +78,7 @@ def make_euclidean_matrix(coords_1: np.ndarray, coords_2: np.ndarray) -> np.ndar
     euclidean_matrix = np.zeros((coords_1.shape[0], coords_2.shape[0]))
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
-            euclidean_matrix[i, j] = np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1))
+            euclidean_matrix[i, j] = np.sum(np.abs(coords_1[i] - coords_2[j]), axis=-1)
     return euclidean_matrix
 
 
