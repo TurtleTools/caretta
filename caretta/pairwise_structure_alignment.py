@@ -65,14 +65,17 @@ class StructurePair:
             gap character (-1 if array, '-' if string)
 
         Returns
-        -------
+        ------- 
         RMSD of paired coordinates,
         coverage of first protein (number of positions used in RMSD calculation / total number of positions),
         coverage of second protein,
         coverage of alignment (number of positions used in RMSD calculation / length of alignment)
         """
         common_coords_1, common_coords_2 = self.get_common_coordinates(aln_array_1, aln_array_2)
-        rmsd = rmsd_calculations.get_rmsd_superimposed(common_coords_1, common_coords_2)
+        try:
+            rmsd = rmsd_calculations.get_rmsd_superimposed(common_coords_1, common_coords_2)
+        except ZeroDivisionError:
+            rmsd = 999
         return RMSD(rmsd, common_coords_1.shape[0], aln_array_1, aln_array_2, gap=gap)
 
     def get_dtw_alignment(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty=0.,
