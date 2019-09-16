@@ -127,7 +127,6 @@ class StructureMultiple:
     def align(self, alignments: dict, gap_open_penalty: float = 0., gap_extend_penalty: float = 0, superimpose: bool = True) -> dict:
         """
         Makes a multiple structure alignment
-        TODO: Doesn't work if there's only 3 sequences!
 
         Parameters
         ----------
@@ -152,22 +151,14 @@ class StructureMultiple:
                                                       run_dtw=True,
                                                       superimpose=superimpose)
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
-        msa_alignments = {}
         self.tree = tree
         self.branch_lengths = branch_lengths
-        print(tree.shape)
+        msa_alignments = {s.name: {s.name: s.sequence} for s in self.structures}
         for x in range(0, tree.shape[0] - 1, 2):
-            print(x)
             node_1, node_2, node_int = tree[x, 0], tree[x + 1, 0], tree[x, 1]
             assert tree[x + 1, 1] == node_int
             name_1, name_2 = self.structures[node_1].name, self.structures[node_2].name
             name_int = f"int-{node_int}"
-
-            if name_1 not in msa_alignments:
-                msa_alignments[name_1] = {name_1: self.structures[node_1].sequence}
-            if name_2 not in msa_alignments:
-                msa_alignments[name_2] = {name_2: self.structures[node_2].sequence}
-
             aln_coords_1, aln_coords_2, dtw_aln_1, dtw_aln_2 = self._get_i_j_alignment(node_1, node_2,
                                                                                        alignments[name_1], alignments[name_2],
                                                                                        gap_open_penalty=gap_open_penalty,

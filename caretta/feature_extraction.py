@@ -1,18 +1,20 @@
-from pathlib import Path
-
-import numpy as np
-import numba as nb
-import prody as pd
-
-from caretta import helper
 import multiprocessing
 
-# TODO: Use multiprocessing to parallelize extraction of features for many proteins:
-#     with multiprocessing.Pool(processes=num_main_threads) as pool:
-#         pool.starmap(get_dssp_features,
-#                      [(protein, pdb_file, dssp_dir)
-#                       for (protein, pdb_file) in list_of_proteins])
-#     use just pool.map for the others since it's single input
+import numba as nb
+import numpy as np
+import prody as pd
+from scipy import ndimage
+
+from caretta import helper
+
+
+def get_feature_matrix_for_structure(structure, dssp_features, feature_names):
+    feature_matrix = np.zeros((len(feature_names), structure.coords.shape[0]))
+    pos = [x for x, s in enumerate(structure.sequence) if s.upper() != 'X']
+    for i, feature in enumerate(feature_names):
+        feature_values = dssp_features[structure.name][feature].astype(np.float64)[pos]
+        feature_matrix[i, :] = ndimage.gaussian_filter1d(feature_values / np.linalg.norm(feature_values), sigma=20) + 1
+    return feature_matrix
 
 
 def get_anm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
@@ -31,18 +33,18 @@ def get_gnm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
     return pd.calcSqFlucts(protein_gnm)
 
 
-def get_dssp_features_multiple(proteins, pdb_files, dssp_dir, num_threads=20):
+def get_dssp_features_multiple(pdb_files, dssp_dir, num_threads=20):
+    num_threads = min(len(pdb_files), num_threads)
     with multiprocessing.Pool(processes=num_threads) as pool:
-        return pool.starmap(get_dssp_features, [(protein, pdb_file, dssp_dir) for (protein, pdb_file) in zip(proteins, pdb_files)])
+        return pool.starmap(get_dssp_features, [(pdb_file, dssp_dir) for pdb_file in pdb_files])
 
 
-def get_dssp_features(protein: pd.AtomGroup, pdb_file: str, dssp_dir: str):
+def get_dssp_features(pdb_file: str, dssp_dir: str):
     """
     Gets dssp features
 
     Parameters
     ----------
-    protein
     pdb_file
     dssp_dir
 
@@ -58,7 +60,7 @@ def get_dssp_features(protein: pd.AtomGroup, pdb_file: str, dssp_dir: str):
     acc
         number of water molecules in contact with this residue *10. or residue water exposed surface in Angstrom^2.
     alpha
-        virtual torsion angle (dihedral angle) defined by the four Cα atoms of residues I-1,I,I+1,I+2.Used to define chirality.
+        virtual torsion angle (dihedral angle) defined by the four Cα atoms of residues I-1,I,I+1,I+2. Used to define chirality.
     kappa
         virtual bond angle (bend angle) defined by the three Cα atoms of residues I-2,I,I+2. Used to define bend (structure code ‘S’).
     phi
@@ -71,21 +73,20 @@ def get_dssp_features(protein: pd.AtomGroup, pdb_file: str, dssp_dir: str):
     Ignores:
     dssp_bp1, dssp_bp2, and dssp_sheet_label: residue number of first and second bridge partner followed by one letter sheet label
     """
-    pdb_file = Path(pdb_file)
-    if not pdb_file.exists():
-        pd.writePDB(str(pdb_file), protein)
+    pdb_file = str(pdb_file)
     _, name, _ = helper.get_file_parts(pdb_file)
-    dssp_file = pd.execDSSP(str(pdb_file), outputname=name, outputdir=str(dssp_dir))
+    protein = pd.parsePDB(pdb_file)
+    dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
     protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
     dssp_labels = [label for label in protein.getDataLabels() if label.startswith("dssp") and label not in dssp_ignore]
     data = {}
-    alpha_indices = helper.get_alpha_indices(protein)
-    indices = [protein[x].getData("dssp_resnum") for x in alpha_indices]
+    beta_indices = helper.get_beta_indices(protein)
+    indices = [protein[x].getData("dssp_resnum") for x in beta_indices]
     for label in dssp_labels:
-        label_to_index = {i - 1: protein[x].getData(label) for i, x in zip(indices, alpha_indices)}
-        data[f"{label}"] = np.array([label_to_index[i] if i in label_to_index else 0 for i in range(len(alpha_indices))])
-    data["secondary"] = protein.getData("secondary")[alpha_indices]
+        label_to_index = {i - 1: protein[x].getData(label) for i, x in zip(indices, beta_indices)}
+        data[f"{label}"] = np.array([label_to_index[i] if i in label_to_index else 0 for i in range(len(beta_indices))])
+    data["secondary"] = protein.getData("secondary")[beta_indices]
     return data
 
 

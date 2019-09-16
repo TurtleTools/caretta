@@ -46,7 +46,8 @@ class StructurePair:
         """
         assert aln_array_1.shape == aln_array_2.shape
         pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2, gap)
-        return self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
+        return self.structure_1.coords[[p for p in pos_1 if p < self.structure_1.coords.shape[0]]], \
+               self.structure_2.coords[[p for p in pos_2 if p < self.structure_2.coords.shape[0]]]
 
     def get_rmsd_coverage(self, aln_array_1, aln_array_2, gap=-1) -> RMSD:
         """

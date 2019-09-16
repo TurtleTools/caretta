@@ -1,3 +1,4 @@
 prody
 numpy
 numba
+scipy
