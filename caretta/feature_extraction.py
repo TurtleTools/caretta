@@ -1,4 +1,5 @@
 import multiprocessing
+from pathlib import Path
 
 import numba as nb
 import numpy as np
@@ -8,12 +9,19 @@ from scipy import ndimage
 from caretta import helper
 
 
+@nb.njit
+def normalize(numbers):
+    minv, maxv = np.min(numbers), np.max(numbers)
+    return (numbers - minv) / (maxv - minv)
+
+
 def get_feature_matrix_for_structure(structure, dssp_features, feature_names):
-    feature_matrix = np.zeros((len(feature_names), structure.coords.shape[0]))
+    feature_matrix = np.zeros((structure.coords.shape[0], len(feature_names)))
     pos = [x for x, s in enumerate(structure.sequence) if s.upper() != 'X']
     for i, feature in enumerate(feature_names):
-        feature_values = dssp_features[structure.name][feature].astype(np.float64)[pos]
-        feature_matrix[i, :] = ndimage.gaussian_filter1d(feature_values / np.linalg.norm(feature_values), sigma=20) + 1
+        feature_values = dssp_features[feature].astype(np.float64)[pos]
+        feature_matrix[:, i] = ndimage.gaussian_filter1d(normalize(feature_values), sigma=5)
+        # feature_matrix[:, i] = normalize(feature_values)
     return feature_matrix
 
 
@@ -76,6 +84,8 @@ def get_dssp_features(pdb_file: str, dssp_dir: str):
     pdb_file = str(pdb_file)
     _, name, _ = helper.get_file_parts(pdb_file)
     protein = pd.parsePDB(pdb_file)
+    pdb_file = str(Path(dssp_dir) / f"{name}.pdb")
+    pd.writePDB(pdb_file, protein)
     dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
     protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]

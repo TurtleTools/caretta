@@ -35,6 +35,7 @@ def make_structures(names: list, sequences: list, coords: list) -> list:
 class StructureMultiple:
     def __init__(self, structures: typing.List[psa.Structure]):
         self.structures = [s for s in structures]
+        self.final_structures = []
         self.num_structures = len(structures)
         self.tree = None
         self.branch_lengths = None
@@ -62,7 +63,7 @@ class StructureMultiple:
         RMSD matrix, coverage matrix
         """
         num = self.num_structures
-        pairwise_matrix = np.zeros((num, num))
+        pairwise_rmsd_matrix = np.zeros((num, num))
         pairwise_coverage = np.zeros((num, num))
         for i in range(num):
             for j in range(num):
@@ -82,9 +83,11 @@ class StructureMultiple:
                         aln_1 = alignments[name_1]
                         aln_2 = alignments[name_2]
                     rmsd_class = structure_pair.get_rmsd_coverage(aln_1, aln_2)
-                pairwise_matrix[i, j] = rmsd_class.rmsd
+                pairwise_rmsd_matrix[i, j] = rmsd_class.rmsd
                 pairwise_coverage[i, j] = rmsd_class.coverage_aln
-        return pairwise_matrix, pairwise_coverage
+        pairwise_matrix = (pairwise_rmsd_matrix - np.min(pairwise_rmsd_matrix)) / (np.max(pairwise_rmsd_matrix) - np.min(pairwise_rmsd_matrix))
+        pairwise_matrix *= (1 - pairwise_coverage)
+        return pairwise_rmsd_matrix, pairwise_coverage, pairwise_matrix
 
     def _get_i_j_alignment(self, i: int, j: int, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap_open_penalty: float,
                            gap_extend_penalty: float):
@@ -113,7 +116,7 @@ class StructureMultiple:
         DTW alignment of structure_1 coords,
         DTW alignment of structure_2 coords
         """
-        structure_pair = psa.StructurePair(self.structures[i], self.structures[j])
+        structure_pair = psa.StructurePair(self.final_structures[i], self.final_structures[j])
         dtw_aln_1, dtw_aln_2 = structure_pair.get_dtw_alignment(aln_array_1, aln_array_2,
                                                                 gap_open_penalty=gap_open_penalty,
                                                                 gap_extend_penalty=gap_extend_penalty)
@@ -144,20 +147,21 @@ class StructureMultiple:
         final coordinates stored in self.structures[-1]
         intermediate nodes of neighbor-joining tree stored in self.structures[self.num_structures:]
         """
+        self.final_structures = [s for s in self.structures]
         alignments = {k: helper.aligned_string_to_array(alignments[k]) for k in alignments}
-        pw_matrix, _ = self.make_pairwise_rmsd_matrix(alignments,
-                                                      gap_open_penalty=gap_open_penalty,
-                                                      gap_extend_penalty=gap_extend_penalty,
-                                                      run_dtw=True,
-                                                      superimpose=superimpose)
+        _, _, pw_matrix = self.make_pairwise_rmsd_matrix(alignments,
+                                                         gap_open_penalty=gap_open_penalty,
+                                                         gap_extend_penalty=gap_extend_penalty,
+                                                         run_dtw=True,
+                                                         superimpose=superimpose)
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
-        msa_alignments = {s.name: {s.name: s.sequence} for s in self.structures}
+        msa_alignments = {s.name: {s.name: s.sequence} for s in self.final_structures}
         for x in range(0, tree.shape[0] - 1, 2):
             node_1, node_2, node_int = tree[x, 0], tree[x + 1, 0], tree[x, 1]
             assert tree[x + 1, 1] == node_int
-            name_1, name_2 = self.structures[node_1].name, self.structures[node_2].name
+            name_1, name_2 = self.final_structures[node_1].name, self.final_structures[node_2].name
             name_int = f"int-{node_int}"
             aln_coords_1, aln_coords_2, dtw_aln_1, dtw_aln_2 = self._get_i_j_alignment(node_1, node_2,
                                                                                        alignments[name_1], alignments[name_2],
@@ -170,11 +174,11 @@ class StructureMultiple:
             msa_alignments[name_int] = {**msa_alignments[name_1], **msa_alignments[name_2]}
 
             mean_coords = get_mean_coords(aln_coords_1, aln_coords_2)
-            self.structures.append(psa.Structure(name_int, None, mean_coords))
+            self.final_structures.append(psa.Structure(name_int, None, mean_coords))
             alignments[name_int] = alignments[name_1]
 
         node_1, node_2 = tree[-1, 0], tree[-1, 1]
-        name_1, name_2 = self.structures[node_1].name, self.structures[node_2].name
+        name_1, name_2 = self.final_structures[node_1].name, self.final_structures[node_2].name
         aln_coords_1, aln_coords_2, dtw_aln_1, dtw_aln_2 = self._get_i_j_alignment(node_1, node_2, alignments[name_1], alignments[name_2],
                                                                                    gap_open_penalty=gap_open_penalty,
                                                                                    gap_extend_penalty=gap_extend_penalty)
@@ -183,5 +187,5 @@ class StructureMultiple:
         msa_alignments[name_2] = {name: "".join([sequence[i] if i != -1 else '-' for i in dtw_aln_2]) for name, sequence in
                                   msa_alignments[name_2].items()}
         mean_coords = get_mean_coords(aln_coords_1, aln_coords_2)
-        self.structures.append(psa.Structure(f"int-final", None, mean_coords))
+        self.final_structures.append(psa.Structure(f"int-final", None, mean_coords))
         return {**msa_alignments[name_1], **msa_alignments[name_2]}
