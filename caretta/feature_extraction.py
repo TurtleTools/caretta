@@ -30,7 +30,7 @@ def get_dssp_features_multiple(pdb_files, dssp_dir, num_threads=20):
         return pool.starmap(get_dssp_features, [(pdb_file, dssp_dir) for pdb_file in pdb_files])
 
 
-def get_dssp_features(pdb_file: str, dssp_dir: str):
+def get_dssp_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrite=False):
     """
     Gets dssp features
 
@@ -38,6 +38,10 @@ def get_dssp_features(pdb_file: str, dssp_dir: str):
     ----------
     pdb_file
     dssp_dir
+    rewrite_pdb
+        rewrites pdb file into dssp_dir with .pdb extension
+    force_overwrite
+        remakes dssp_file even if already exists
 
     Returns
     -------
@@ -67,9 +71,12 @@ def get_dssp_features(pdb_file: str, dssp_dir: str):
     pdb_file = str(pdb_file)
     _, name, _ = helper.get_file_parts(pdb_file)
     protein = pd.parsePDB(pdb_file)
-    pdb_file = str(Path(dssp_dir) / f"{name}.pdb")
-    pd.writePDB(pdb_file, protein)
-    dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
+    if rewrite_pdb:
+        pdb_file = str(Path(dssp_dir) / f"{name}.pdb")
+        pd.writePDB(pdb_file, protein)
+    dssp_file = Path(dssp_dir) / f"{name}.dssp"
+    if force_overwrite or not dssp_file.exists():
+        dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
     protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
     dssp_labels = [label for label in protein.getDataLabels() if label.startswith("dssp") and label not in dssp_ignore]
