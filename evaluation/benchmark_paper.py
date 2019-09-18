@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import prody as pd
 
+from caretta import feature_extraction
 from caretta import helper
 from caretta import multiple_structure_alignment as msa
 from caretta import pairwise_structure_alignment as psa
@@ -70,7 +71,7 @@ def get_sequence_alignment(sequences: typing.Dict[str, str], directory, name="re
     return helper.get_sequences_from_fasta(aln_sequence_file)
 
 
-def get_structures(pdb_dir) -> typing.List[psa.Structure]:
+def get_structures(pdb_dir, dssp_dir, feature_names):
     """
     Get list of Structure objects from a directory of PDB files
     """
@@ -78,15 +79,17 @@ def get_structures(pdb_dir) -> typing.List[psa.Structure]:
     names = list(pdbs.keys())
     sequences = get_sequences(pdbs)
     coordinates = [pdbs[n][helper.get_beta_indices(pdbs[n])].getCoords().astype(np.float64) for n in names]
-    structures = msa.make_structures(names, [sequences[n] for n in names], coordinates)
+    features = feature_extraction.get_dssp_features_multiple([str(pdb_dir / f"{name}.ent") for name in names], str(dssp_dir))
+    structures = [psa.Structure(names[i], sequences[names[i]], coordinates[i], features[i],
+                                make_feature_matrix=True, feature_names=feature_names) for i in range(len(names))]
     return structures
 
 
-def get_msa(pdb_dir, sequence_dir, name="ref", gap_open_penalty: float = 0., gap_extend_penalty: float = 0.):
+def get_msa(pdb_dir, sequence_dir, dssp_dir, feature_names, name="ref", gap_open_penalty: float = 0., gap_extend_penalty: float = 0.):
     """
     Example usage of above functions to make a structure-guided multiple sequence alignment from a directory of PDB files
     """
-    structures = get_structures(pdb_dir)
+    structures = get_structures(pdb_dir, dssp_dir, feature_names)
     msa_class = msa.StructureMultiple(structures)
     aln_sequences = get_sequence_alignment({s.name: s.sequence for s in msa_class.structures}, sequence_dir, name)
     return msa_class.align(aln_sequences, gap_open_penalty, gap_extend_penalty)

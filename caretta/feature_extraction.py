@@ -4,25 +4,8 @@ from pathlib import Path
 import numba as nb
 import numpy as np
 import prody as pd
-from scipy import ndimage
 
 from caretta import helper
-
-
-@nb.njit
-def normalize(numbers):
-    minv, maxv = np.min(numbers), np.max(numbers)
-    return (numbers - minv) / (maxv - minv)
-
-
-def get_feature_matrix_for_structure(structure, dssp_features, feature_names):
-    feature_matrix = np.zeros((structure.coords.shape[0], len(feature_names)))
-    pos = [x for x, s in enumerate(structure.sequence) if s.upper() != 'X']
-    for i, feature in enumerate(feature_names):
-        feature_values = dssp_features[feature].astype(np.float64)[pos]
-        feature_matrix[:, i] = ndimage.gaussian_filter1d(normalize(feature_values), sigma=5)
-        # feature_matrix[:, i] = normalize(feature_values)
-    return feature_matrix
 
 
 def get_anm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):

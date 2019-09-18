@@ -18,10 +18,23 @@ class RMSD:
 
 
 class Structure:
-    def __init__(self, name: str, sequence: typing.Union[str, None], coords: np.ndarray):
+    def __init__(self, name: str, sequence: typing.Union[str, None], coords: np.ndarray, features, make_feature_matrix=False, feature_names=()):
         self.name = name
         self.sequence = sequence
         self.coords = coords
+        if make_feature_matrix:
+            self.features = self.get_feature_matrix(features, feature_names)
+        else:
+            self.features = features
+
+    def get_feature_matrix(self, dssp_features, feature_names):
+        feature_matrix = np.zeros((self.coords.shape[0], len(feature_names)))
+        pos = [x for x, s in enumerate(self.sequence) if s.upper() != 'X']
+        for i, feature in enumerate(feature_names):
+            feature_values = dssp_features[feature].astype(np.float64)[pos]
+            # feature_matrix[:, i] = ndimage.gaussian_filter1d(helper.normalize(feature_values), sigma=2)
+            feature_matrix[:, i] = helper.normalize(feature_values)
+        return feature_matrix
 
 
 class StructurePair:
@@ -29,7 +42,7 @@ class StructurePair:
         self.structure_1 = structure_1
         self.structure_2 = structure_2
 
-    def get_common_coordinates(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap=-1):
+    def get_common_coordinates(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap=-1, get_coords=True):
         """
         Gets coordinates according to an alignment where neither position is a gap
 
@@ -46,8 +59,12 @@ class StructurePair:
         """
         assert aln_array_1.shape == aln_array_2.shape
         pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2, gap)
-        return self.structure_1.coords[[p for p in pos_1 if p < self.structure_1.coords.shape[0]]], \
-               self.structure_2.coords[[p for p in pos_2 if p < self.structure_2.coords.shape[0]]]
+        if get_coords:
+            return self.structure_1.coords[[p for p in pos_1 if p < self.structure_1.coords.shape[0]]], \
+                   self.structure_2.coords[[p for p in pos_2 if p < self.structure_2.coords.shape[0]]]
+        else:
+            return self.structure_1.features[[p for p in pos_1 if p < self.structure_1.features.shape[0]]], \
+                   self.structure_2.features[[p for p in pos_2 if p < self.structure_2.features.shape[0]]]
 
     def get_rmsd_coverage(self, aln_array_1, aln_array_2, gap=-1) -> RMSD:
         """
@@ -79,8 +96,18 @@ class StructurePair:
             rmsd = 999
         return RMSD(rmsd, common_coords_1.shape[0], aln_array_1, aln_array_2, gap=gap)
 
-    def get_dtw_alignment(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty=0.,
-                          superimpose: bool = True):
+    def get_dtw_feature_alignment(self, gap_open_feature: float = 1., gap_extend_feature: float = 1):
+        distance_matrix = rmsd_calculations.make_euclidean_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
+        dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_feature, gap_extend_feature)
+        return dtw_aln_array_1, dtw_aln_array_2, score
+
+    def get_dtw_feature_coord_alignment(self, gap_open_feature: float = 1., gap_extend_feature: float = 1., gap_open_coord: float = 10.,
+                                        gap_extend_coord: float = 2.):
+        feature_aln_1, feature_aln_2, score = self.get_dtw_feature_alignment(gap_open_feature, gap_extend_feature)
+        return self.get_dtw_coord_alignment(feature_aln_1, feature_aln_2, gap_open_coord, gap_extend_coord)
+
+    def get_dtw_coord_alignment(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty=0.,
+                                superimpose: bool = True):
         """
         Aligns two sets of coordinates using dynamic time warping
         aln_array_1 and aln_array_2 are used to find the initial rotation/translation
@@ -108,6 +135,6 @@ class StructurePair:
             coords_2 = rmsd_calculations.apply_rotran(self.structure_2.coords, rotation_matrix, translation_matrix)
         else:
             coords_2 = self.structure_2.coords
-        distance_matrix = rmsd_calculations.make_euclidean_matrix(self.structure_1.coords, coords_2)
-        dtw_aln_array_1, dtw_aln_array_2 = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
+        distance_matrix = rmsd_calculations.make_euclidean_matrix(self.structure_1.coords, coords_2, normalize=True)
+        dtw_aln_array_1, dtw_aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         return dtw_aln_array_1, dtw_aln_array_2

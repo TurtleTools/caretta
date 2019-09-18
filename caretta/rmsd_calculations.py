@@ -1,6 +1,8 @@
 import numba as nb
 import numpy as np
 
+from caretta import helper
+
 
 @nb.njit
 def _nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
@@ -61,7 +63,7 @@ def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_ma
 
 
 @nb.njit
-def make_euclidean_matrix(coords_1: np.ndarray, coords_2: np.ndarray) -> np.ndarray:
+def make_euclidean_matrix(coords_1: np.ndarray, coords_2: np.ndarray, normalize=False) -> np.ndarray:
     """
     Makes matrix of euclidean distances of each coordinate in coords_1 to each coordinate in coords_2
     TODO: probably faster to do upper triangle += transpose
@@ -79,7 +81,10 @@ def make_euclidean_matrix(coords_1: np.ndarray, coords_2: np.ndarray) -> np.ndar
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
             euclidean_matrix[i, j] = np.sum(np.abs(coords_1[i] - coords_2[j]), axis=-1)
-    return euclidean_matrix
+    if normalize:
+        return helper.normalize(euclidean_matrix)
+    else:
+        return euclidean_matrix
 
 
 @nb.njit

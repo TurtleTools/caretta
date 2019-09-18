@@ -7,6 +7,11 @@ import numpy as np
 import prody as pd
 
 
+@nb.njit
+def normalize(numbers):
+    minv, maxv = np.min(numbers), np.max(numbers)
+    return (numbers - minv) / (maxv - minv)
+
 def aligned_string_to_array(aln: str) -> np.ndarray:
     """
     Aligned sequence to array of indices with gaps as -1

@@ -27,7 +27,7 @@ def _make_dtw_matrix(distance_matrix: np.ndarray,
     matrix[:, 0, :] = np.inf
     matrix[0, :, :] = np.inf
     matrix[0, 0] = 0
-    backtrack = np.zeros((n + 1, m + 1, 3), dtype=np.int32)
+    backtrack = np.zeros((n + 1, m + 1, 3), dtype=np.int64)
     for i in range(1, n + 1):
         matrix[i, 0, 0] = gap_open_penalty + ((i - 1) * gap_extend_penalty)
         matrix[i, 0, 1] = gap_open_penalty + ((i - 1) * gap_extend_penalty)
@@ -140,4 +140,4 @@ def dtw_align(distance_matrix: np.ndarray, gap_open_penalty: float = 0., gap_ext
     scores = np.array([matrix[n, m, 0], matrix[n, m, 1], matrix[n, m, 2]])
     index = np.argmin(scores)
     aln_1, aln_2 = _get_dtw_alignment(index, backtrack, n, m)
-    return aln_1, aln_2
+    return aln_1, aln_2, scores[index]
