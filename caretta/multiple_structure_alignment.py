@@ -102,7 +102,9 @@ class StructureMultiple:
                     except ZeroDivisionError:
                         rmsd = 999
                 pairwise_rmsd_matrix[i, j] = rmsd
+                pairwise_rmsd_matrix[j, i] = rmsd
                 pairwise_coverage[i, j] = len(aln_1) / common_coords_1.shape[0]
+                pairwise_coverage[j, i] = pairwise_coverage[i, j]
         return pairwise_rmsd_matrix, pairwise_coverage
 
     def make_pairwise_dtw_rmsd_matrix(self, alignments: dict, superimpose: bool = True, gap_open_penalty: float = 0.,
