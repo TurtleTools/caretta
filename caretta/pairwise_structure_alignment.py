@@ -66,6 +66,7 @@ class StructurePair:
             return self.structure_1.features[[p for p in pos_1 if p < self.structure_1.features.shape[0]]], \
                    self.structure_2.features[[p for p in pos_2 if p < self.structure_2.features.shape[0]]]
 
+
     def get_rmsd_coverage(self, aln_array_1, aln_array_2, gap=-1) -> RMSD:
         """
         Finds SVD superimposed RMSD of two sets of coordinates
@@ -97,7 +98,7 @@ class StructurePair:
         return RMSD(rmsd, common_coords_1.shape[0], aln_array_1, aln_array_2, gap=gap)
 
     def get_dtw_feature_alignment(self, gap_open_feature: float = 1., gap_extend_feature: float = 1):
-        distance_matrix = rmsd_calculations.make_euclidean_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
+        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_feature, gap_extend_feature)
         return dtw_aln_array_1, dtw_aln_array_2, score
 
@@ -135,6 +136,6 @@ class StructurePair:
             coords_2 = rmsd_calculations.apply_rotran(self.structure_2.coords, rotation_matrix, translation_matrix)
         else:
             coords_2 = self.structure_2.coords
-        distance_matrix = rmsd_calculations.make_euclidean_matrix(self.structure_1.coords, coords_2, normalize=True)
+        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, normalize=True)
         dtw_aln_array_1, dtw_aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         return dtw_aln_array_1, dtw_aln_array_2

@@ -108,7 +108,8 @@ def _find_join_nodes(distance_matrix):
     for i in range(n):
         for j in range(n):
             if i != j:
-                q_matrix[i, j] = (n - 2) * distance_matrix[i, j] - np.sum(distance_matrix[i, :]) - np.sum(distance_matrix[j, :])
+                # q_matrix[i, j] = (n - 2) * distance_matrix[i, j] - np.sum(distance_matrix[i, :]) - np.sum(distance_matrix[j, :])
+                q_matrix[i, j] = distance_matrix[i, j]
                 if q_matrix[i, j] < min_q:
                     min_ij[0], min_ij[1] = i, j
                     min_q = q_matrix[i, j]

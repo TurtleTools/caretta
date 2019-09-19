@@ -63,7 +63,7 @@ def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_ma
 
 
 @nb.njit
-def make_euclidean_matrix(coords_1: np.ndarray, coords_2: np.ndarray, normalize=False) -> np.ndarray:
+def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, euclidean=False, normalize=False) -> np.ndarray:
     """
     Makes matrix of euclidean distances of each coordinate in coords_1 to each coordinate in coords_2
     TODO: probably faster to do upper triangle += transpose
@@ -73,18 +73,23 @@ def make_euclidean_matrix(coords_1: np.ndarray, coords_2: np.ndarray, normalize=
         shape = (n, 3)
     coords_2
         shape = (m, 3)
+    euclidean
+    normalize
     Returns
     -------
     matrix; shape = (n, m)
     """
-    euclidean_matrix = np.zeros((coords_1.shape[0], coords_2.shape[0]))
+    distance_matrix = np.zeros((coords_1.shape[0], coords_2.shape[0]))
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
-            euclidean_matrix[i, j] = np.sum(np.abs(coords_1[i] - coords_2[j]), axis=-1)
+            if euclidean:
+                distance_matrix[i, j] = np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1))
+            else:
+                distance_matrix[i, j] = np.sum(np.abs(coords_1[i] - coords_2[j]), axis=-1)
     if normalize:
-        return helper.normalize(euclidean_matrix)
+        return helper.normalize(distance_matrix)
     else:
-        return euclidean_matrix
+        return distance_matrix
 
 
 @nb.njit

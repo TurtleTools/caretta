@@ -28,6 +28,25 @@ def get_mean_coords(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) -> np.nd
     return mean_coords
 
 
+@nb.njit
+def get_fraction_aligned(coords_1, coords_2, threshold=3.5):
+    """
+    Number of residue pairs which are closer than threshold in superimposed structure pair
+
+    Parameters
+    ----------
+    coords_1
+    coords_2
+    threshold
+
+    Returns
+    -------
+    number of close residue pairs
+    """
+    distances = np.sqrt(np.sum((coords_1 - coords_2) ** 2, axis=-1))
+    return np.where(distances <= threshold)[0].shape
+
+
 class StructureMultiple:
     def __init__(self, structures: typing.List[psa.Structure]):
         self.structures = [s for s in structures]
@@ -68,7 +87,11 @@ class StructureMultiple:
         """
         num = self.num_structures
         pairwise_rmsd_matrix = np.zeros((num, num))
+        pairwise_rmsd_matrix[:] = np.nan
         pairwise_coverage = np.zeros((num, num))
+        pairwise_coverage[:] = np.nan
+        pairwise_frac_matrix = np.zeros((num, num))
+        pairwise_frac_matrix[:] = np.nan
         if superimpose_first:
             structures = [psa.Structure(self.structures[0].name,
                                         self.structures[0].sequence,
@@ -84,7 +107,7 @@ class StructureMultiple:
         else:
             structures = [s for s in self.structures]
         for i in range(num):
-            for j in range(i, num):
+            for j in range(i + 1, num):
                 name_1, name_2 = structures[i].name, structures[j].name
                 structure_pair = psa.StructurePair(structures[i], structures[j])
                 if isinstance(alignments[name_1], str):
@@ -94,18 +117,15 @@ class StructureMultiple:
                     aln_1 = alignments[name_1]
                     aln_2 = alignments[name_2]
                 common_coords_1, common_coords_2 = structure_pair.get_common_coordinates(aln_1, aln_2)
-                if superimpose_first:
-                    rmsd = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
-                else:
-                    try:
-                        rmsd = rmsd_calculations.get_rmsd_superimposed(common_coords_1, common_coords_2)
-                    except ZeroDivisionError:
-                        rmsd = 999
-                pairwise_rmsd_matrix[i, j] = rmsd
-                pairwise_rmsd_matrix[j, i] = rmsd
-                pairwise_coverage[i, j] = len(aln_1) / common_coords_1.shape[0]
-                pairwise_coverage[j, i] = pairwise_coverage[i, j]
-        return pairwise_rmsd_matrix, pairwise_coverage
+                assert common_coords_1.shape[0] > 0
+                if not superimpose_first:
+                    rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
+                    common_coords_2 = rmsd_calculations.apply_rotran(common_coords_2, rot, tran)
+                frac = get_fraction_aligned(common_coords_1, common_coords_2)
+                pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
+                pairwise_coverage[i, j] = pairwise_coverage[j, i] = common_coords_1.shape[0] / len(aln_1)
+                pairwise_frac_matrix[i, j] = pairwise_frac_matrix[j, i] = frac
+        return pairwise_rmsd_matrix, pairwise_coverage, pairwise_frac_matrix
 
     def make_pairwise_dtw_rmsd_matrix(self, alignments: dict, superimpose: bool = True, gap_open_penalty: float = 0.,
                                       gap_extend_penalty: float = 0.):
