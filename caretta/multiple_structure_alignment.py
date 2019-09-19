@@ -44,7 +44,7 @@ def get_fraction_aligned(coords_1, coords_2, threshold=3.5):
     number of close residue pairs
     """
     distances = np.sqrt(np.sum((coords_1 - coords_2) ** 2, axis=-1))
-    return np.where(distances <= threshold)[0].shape
+    return np.where(distances <= threshold)[0].shape / coords_1.shape[0]
 
 
 class StructureMultiple:
