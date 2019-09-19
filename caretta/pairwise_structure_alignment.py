@@ -1,5 +1,6 @@
 import typing
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from caretta import dynamic_time_warping as dtw
@@ -65,7 +66,6 @@ class StructurePair:
         else:
             return self.structure_1.features[[p for p in pos_1 if p < self.structure_1.features.shape[0]]], \
                    self.structure_2.features[[p for p in pos_2 if p < self.structure_2.features.shape[0]]]
-
 
     def get_rmsd_coverage(self, aln_array_1, aln_array_2, gap=-1) -> RMSD:
         """
@@ -136,6 +136,13 @@ class StructurePair:
             coords_2 = rmsd_calculations.apply_rotran(self.structure_2.coords, rotation_matrix, translation_matrix)
         else:
             coords_2 = self.structure_2.coords
-        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, normalize=True)
-        dtw_aln_array_1, dtw_aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
-        return dtw_aln_array_1, dtw_aln_array_2
+        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, normalize=False)
+        dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
+        pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
+        plt.figure(figsize=(10, 10))
+        plt.imshow(distance_matrix, interpolation="nearest")
+        plt.colorbar()
+        plt.scatter(pos_2, pos_1, c='red', s=10, alpha=0.5)
+
+        plt.pause(0.0001)
+        return dtw_aln_array_1, dtw_aln_array_2, score

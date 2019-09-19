@@ -1,6 +1,7 @@
 import numba as nb
 import numpy as np
 
+MINV = np.finfo(np.float64).min
 
 @nb.njit
 def _make_dtw_matrix(distance_matrix: np.ndarray,
@@ -22,20 +23,22 @@ def _make_dtw_matrix(distance_matrix: np.ndarray,
     -------
     accumulated cost matrix; shape = (n, m)
     """
+    gap_open_penalty *= -1
+    gap_extend_penalty *= -1
     n, m = distance_matrix.shape
     matrix = np.zeros((n + 1, m + 1, 3), dtype=np.float64)
-    matrix[:, 0, :] = np.inf
-    matrix[0, :, :] = np.inf
+    matrix[:, 0, :] = MINV
+    matrix[0, :, :] = MINV
     matrix[0, 0] = 0
     backtrack = np.zeros((n + 1, m + 1, 3), dtype=np.int64)
     for i in range(1, n + 1):
         matrix[i, 0, 0] = gap_open_penalty + ((i - 1) * gap_extend_penalty)
         matrix[i, 0, 1] = gap_open_penalty + ((i - 1) * gap_extend_penalty)
-        matrix[i, 0, 2] = np.inf - gap_open_penalty
+        matrix[i, 0, 2] = MINV - gap_open_penalty
         backtrack[i, 0] = 0
 
     for j in range(1, m + 1):
-        matrix[0, j, 0] = np.inf - gap_open_penalty
+        matrix[0, j, 0] = MINV - gap_open_penalty
         matrix[0, j, 1] = gap_open_penalty + ((j - 1) * gap_extend_penalty)
         matrix[0, j, 2] = gap_open_penalty + ((j - 1) * gap_extend_penalty)
         backtrack[0, j] = 1
@@ -43,23 +46,23 @@ def _make_dtw_matrix(distance_matrix: np.ndarray,
     for i in range(1, n + 1):
         for j in range(1, m + 1):
             scores_lower = np.array([matrix[i - 1, j, 0] + gap_extend_penalty,
-                                     matrix[i - 1, j, 1] + gap_open_penalty]) + distance_matrix[i - 1, j]
-            min_index_lower = np.argmin(scores_lower)
+                                     matrix[i - 1, j, 1] + gap_open_penalty])  # + distance_matrix[i - 1, j - 1]
+            min_index_lower = np.argmax(scores_lower)
             min_value_lower = scores_lower[min_index_lower]
             matrix[i, j, 0] = min_value_lower
             backtrack[i, j, 0] = min_index_lower
 
             scores_upper = np.array([matrix[i, j - 1, 1] + gap_open_penalty,
-                                     matrix[i, j - 1, 2] + gap_extend_penalty]) + distance_matrix[i, j - 1]
-            min_index_upper = np.argmin(scores_upper)
+                                     matrix[i, j - 1, 2] + gap_extend_penalty])  # + distance_matrix[i - 1, j - 1]
+            min_index_upper = np.argmax(scores_upper)
             min_value_upper = scores_upper[min_index_upper]
             matrix[i, j, 2] = min_value_upper
             backtrack[i, j, 2] = min_index_upper + 1
 
             scores = np.array([matrix[i, j, 0],
-                               matrix[i - 1, j - 1, 1],
-                               matrix[i, j, 2]]) + distance_matrix[i - 1, j - 1]
-            min_index = np.argmin(scores)
+                               matrix[i - 1, j - 1, 1] + distance_matrix[i, j],
+                               matrix[i, j, 2]])
+            min_index = np.argmax(scores)
             min_value = scores[min_index]
             matrix[i, j, 1] = min_value
             backtrack[i, j, 1] = min_index
@@ -140,6 +143,6 @@ def dtw_align(distance_matrix: np.ndarray, gap_open_penalty: float = 0., gap_ext
     n = distance_matrix.shape[0]
     m = distance_matrix.shape[1]
     scores = np.array([matrix[n, m, 0], matrix[n, m, 1], matrix[n, m, 2]])
-    index = np.argmin(scores)
+    index = np.argmax(scores)
     aln_1, aln_2 = _get_dtw_alignment(index, backtrack, n, m)
     return aln_1, aln_2, scores[index]

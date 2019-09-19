@@ -64,8 +64,8 @@ class StructureMultiple:
                 structure_pair = psa.StructurePair(self.structures[i], self.structures[j])
                 dtw_aln_1, dtw_aln_2, score = structure_pair.get_dtw_feature_alignment(gap_open_feature=gap_open_penalty,
                                                                                        gap_extend_feature=gap_extend_penalty)
-                pairwise_matrix[i, j] = score
-                pairwise_matrix[j, i] = score
+                pairwise_matrix[i, j] = -score
+                pairwise_matrix[j, i] = -score
                 pairwise_alns[(name_1, name_2)] = (dtw_aln_1, dtw_aln_2)
                 pairwise_alns[(name_2, name_1)] = (dtw_aln_2, dtw_aln_1)
         return pairwise_matrix, pairwise_alns
@@ -150,16 +150,19 @@ class StructureMultiple:
         pairwise_rmsd_matrix = np.zeros((num, num))
         pairwise_coverage = np.zeros((num, num))
         for i in range(num):
-            for j in range(num):
+            for j in range(i, num):
                 name_1, name_2 = self.structures[i].name, self.structures[j].name
                 structure_pair = psa.StructurePair(self.structures[i], self.structures[j])
-                dtw_aln_1, dtw_aln_2 = structure_pair.get_dtw_coord_alignment(alignments[name_1], alignments[name_2],
-                                                                              superimpose=superimpose,
-                                                                              gap_open_penalty=gap_open_penalty,
-                                                                              gap_extend_penalty=gap_extend_penalty)
+                dtw_aln_1, dtw_aln_2, score = structure_pair.get_dtw_coord_alignment(alignments[name_1], alignments[name_2],
+                                                                                     superimpose=superimpose,
+                                                                                     gap_open_penalty=gap_open_penalty,
+                                                                                     gap_extend_penalty=gap_extend_penalty)
                 rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
+                print(rmsd_class.rmsd)
                 pairwise_rmsd_matrix[i, j] = rmsd_class.rmsd
-                pairwise_coverage[i, j] = rmsd_class.coverage_aln
+                pairwise_coverage[i, j] = pairwise_coverage[j, i] = rmsd_class.coverage_aln
+                # pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score
+                # pairwise_coverage[i, j] = pairwise_coverage[j, i] =
         return pairwise_rmsd_matrix, pairwise_coverage
 
     def _get_i_j_alignment(self, i: int, j: int, aln_array_1: np.ndarray, aln_array_2: np.ndarray,
@@ -192,9 +195,9 @@ class StructureMultiple:
         DTW alignment of structure_2 coords
         """
         structure_pair = psa.StructurePair(self.final_structures[i], self.final_structures[j])
-        dtw_aln_1, dtw_aln_2 = structure_pair.get_dtw_coord_alignment(aln_array_1, aln_array_2,
-                                                                      gap_open_penalty=gap_open_penalty,
-                                                                      gap_extend_penalty=gap_extend_penalty)
+        dtw_aln_1, dtw_aln_2, _ = structure_pair.get_dtw_coord_alignment(aln_array_1, aln_array_2,
+                                                                         gap_open_penalty=gap_open_penalty,
+                                                                         gap_extend_penalty=gap_extend_penalty)
         if superimpose:
             common_coords_1, common_coords_2 = structure_pair.get_common_coordinates(dtw_aln_1, dtw_aln_2)
             rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)

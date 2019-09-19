@@ -80,12 +80,14 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, euclidean=F
     matrix; shape = (n, m)
     """
     distance_matrix = np.zeros((coords_1.shape[0], coords_2.shape[0]))
+    gamma = 0.3
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
             if euclidean:
                 distance_matrix[i, j] = np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1))
             else:
-                distance_matrix[i, j] = np.sum(np.abs(coords_1[i] - coords_2[j]), axis=-1)
+                # distance_matrix[i, j] = 1 / (1 + np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1)))
+                distance_matrix[i, j] = np.exp(-gamma * np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1)))
     if normalize:
         return helper.normalize(distance_matrix)
     else:
