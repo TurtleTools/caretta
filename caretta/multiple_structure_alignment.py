@@ -28,7 +28,6 @@ def get_mean_coords(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) -> np.nd
     return mean_coords
 
 
-@nb.njit
 def get_fraction_aligned(coords_1, coords_2, threshold=3.5):
     """
     Number of residue pairs which are closer than threshold in superimposed structure pair
