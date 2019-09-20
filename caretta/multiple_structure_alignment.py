@@ -29,7 +29,7 @@ def get_mean_coords(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) -> np.nd
 
 
 @nb.njit
-def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) -> np.ndarray:
+def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray, add_extra=1.) -> np.ndarray:
     """
     Mean of two coordinate sets (of the same shape)
 
@@ -37,6 +37,7 @@ def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) ->
     ----------
     aln_coords_1
     aln_coords_2
+    add_extra
 
     Returns
     -------
@@ -50,7 +51,7 @@ def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) ->
         if not np.isnan(aln_coords_2[i, 0]):
             mean_coords[i, -1] += aln_coords_2[i, -1]
         if not (np.isnan(aln_coords_1[i, 0]) or np.isnan(aln_coords_2[i, 0])):
-            mean_coords[i, -1] += 1
+            mean_coords[i, -1] += add_extra
     return mean_coords
 
 
@@ -295,7 +296,7 @@ class StructureMultiple:
                                       msa_alignments[name_2].items()}
             msa_alignments[name_int] = {**msa_alignments[name_1], **msa_alignments[name_2]}
 
-            mean_features = get_mean_coords_extra(aln_coords_1, aln_coords_2)
+            mean_features = get_mean_coords_extra(aln_coords_1, aln_coords_2, 0.5)
             self.final_structures.append(psa.Structure(name_int, None, self.final_structures[n1].coords, mean_features, add_column=False))
 
         for x in range(0, tree.shape[0] - 1, 2):
@@ -354,7 +355,7 @@ class StructureMultiple:
                                       msa_alignments[name_2].items()}
             msa_alignments[name_int] = {**msa_alignments[name_1], **msa_alignments[name_2]}
 
-            mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2)
+            mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2, 1)
             self.final_structures.append(psa.Structure(name_int, None, mean_coords, self.final_structures[n1].features, add_column=False))
             alignments[name_int] = alignments[name_1]
             return np.max(mean_coords[:, -1])
