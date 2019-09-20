@@ -50,7 +50,7 @@ def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) ->
         if not np.isnan(aln_coords_2[i, 0]):
             mean_coords[i, -1] += aln_coords_2[i, -1]
         if not (np.isnan(aln_coords_1[i, 0]) or np.isnan(aln_coords_2[i, 0])):
-            mean_coords[i, -1] += 5
+            mean_coords[i, -1] += 1
     return mean_coords
 
 
@@ -295,18 +295,14 @@ class StructureMultiple:
                                       msa_alignments[name_2].items()}
             msa_alignments[name_int] = {**msa_alignments[name_1], **msa_alignments[name_2]}
 
-            mean_features = get_mean_coords(aln_coords_1, aln_coords_2)
+            mean_features = get_mean_coords_extra(aln_coords_1, aln_coords_2)
             self.final_structures.append(psa.Structure(name_int, None, self.final_structures[n1].coords, mean_features, add_column=False))
 
         for x in range(0, tree.shape[0] - 1, 2):
             node_1, node_2, node_int = tree[x, 0], tree[x + 1, 0], tree[x, 1]
             assert tree[x + 1, 1] == node_int
             make_intermediate_node(node_1, node_2, node_int)
-
-        if len(self.structures) == 3:
-            node_1, node_2 = tree[0, 0], tree[0, 1]
-        else:
-            node_1, node_2 = tree[-1, 0], tree[-1, 1]
+        node_1, node_2 = tree[-1, 0], tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
         return {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}
 
@@ -367,9 +363,6 @@ class StructureMultiple:
             node_1, node_2, node_int = self.tree[x, 0], self.tree[x + 1, 0], self.tree[x, 1]
             assert self.tree[x + 1, 1] == node_int
             maximums = make_intermediate_node(node_1, node_2, node_int)
-        if len(self.structures) == 3:
-            node_1, node_2 = self.tree[0, 0], self.tree[0, 1]
-        else:
-            node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
+        node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
         return {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}

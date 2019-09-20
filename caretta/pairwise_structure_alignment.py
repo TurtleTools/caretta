@@ -24,12 +24,17 @@ class Structure:
         self.sequence = sequence
         if add_column:
             self.coords = np.hstack((coords, np.zeros((coords.shape[0], 1))))
+
         else:
             self.coords = coords
         if make_feature_matrix:
             self.features = self.get_feature_matrix(features, feature_names)
+            if add_column:
+                self.features = np.hstack((self.features, np.zeros((self.features.shape[0], 1))))
         else:
             self.features = features
+            if add_column:
+                self.features = np.hstack((self.features, np.zeros((self.features.shape[0], 1))))
 
     def get_feature_matrix(self, dssp_features, feature_names):
         feature_matrix = np.zeros((self.coords.shape[0], len(feature_names)))
