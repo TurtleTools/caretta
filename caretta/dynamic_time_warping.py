@@ -3,6 +3,7 @@ import numpy as np
 
 MINV = np.finfo(np.float64).min
 
+
 @nb.njit
 def _make_dtw_matrix(distance_matrix: np.ndarray,
                      gap_open_penalty: float = 0.,
@@ -32,15 +33,15 @@ def _make_dtw_matrix(distance_matrix: np.ndarray,
     matrix[0, 0] = 0
     backtrack = np.zeros((n + 1, m + 1, 3), dtype=np.int64)
     for i in range(1, n + 1):
-        matrix[i, 0, 0] = gap_open_penalty + ((i - 1) * gap_extend_penalty)
-        matrix[i, 0, 1] = gap_open_penalty + ((i - 1) * gap_extend_penalty)
+        matrix[i, 0, 0] = 0  # gap_extend_penalty  # gap_open_penalty  # + ((i - 1) * gap_extend_penalty)
+        matrix[i, 0, 1] = 0  # gap_extend_penalty  # gap_open_penalty  # + ((i - 1) * gap_extend_penalty)
         matrix[i, 0, 2] = MINV - gap_open_penalty
         backtrack[i, 0] = 0
 
     for j in range(1, m + 1):
-        matrix[0, j, 0] = MINV - gap_open_penalty
-        matrix[0, j, 1] = gap_open_penalty + ((j - 1) * gap_extend_penalty)
-        matrix[0, j, 2] = gap_open_penalty + ((j - 1) * gap_extend_penalty)
+        matrix[0, j, 0] = MINV - gap_open_penalty  # gap_extend_penalty
+        matrix[0, j, 1] = 0  # gap_extend_penalty  # gap_open_penalty  # + ((j - 1) * gap_extend_penalty)
+        matrix[0, j, 2] = 0  # gap_extend_penalty  # gap_open_penalty  # + ((j - 1) * gap_extend_penalty)
         backtrack[0, j] = 1
 
     for i in range(1, n + 1):
@@ -60,7 +61,7 @@ def _make_dtw_matrix(distance_matrix: np.ndarray,
             backtrack[i, j, 2] = min_index_upper + 1
 
             scores = np.array([matrix[i, j, 0],
-                               matrix[i - 1, j - 1, 1] + distance_matrix[i, j],
+                               matrix[i - 1, j - 1, 1] + distance_matrix[i - 1, j - 1],
                                matrix[i, j, 2]])
             min_index = np.argmax(scores)
             min_value = scores[min_index]
@@ -97,28 +98,34 @@ def _get_dtw_alignment(start_direction, backtrack: np.ndarray, n1, m1):
             n -= 1
             indices_1[index] = n
             indices_2[index] = -1
+            index += 1
         elif n == 0:
             m -= 1
             indices_1[index] = -1
             indices_2[index] = m
+            index += 1
         else:
             if direction == 0:
                 direction = backtrack[n, m, 0]
                 n -= 1
                 indices_1[index] = n
                 indices_2[index] = -1
+                index += 1
             elif direction == 1:
                 direction = backtrack[n, m, 1]
-                n -= 1
-                m -= 1
-                indices_1[index] = n
-                indices_2[index] = m
+                if direction == 1:
+                    n -= 1
+                    m -= 1
+                    indices_1[index] = n
+                    indices_2[index] = m
+                    index += 1
             elif direction == 2:
                 direction = backtrack[n, m, 2]
                 m -= 1
                 indices_1[index] = -1
                 indices_2[index] = m
-        index += 1
+                index += 1
+
     return indices_1[:index][::-1], indices_2[:index][::-1]
 
 

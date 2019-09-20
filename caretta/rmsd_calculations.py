@@ -63,7 +63,7 @@ def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_ma
 
 
 @nb.njit
-def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, euclidean=False, normalize=False) -> np.ndarray:
+def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, tm_score=False, normalize=False) -> np.ndarray:
     """
     Makes matrix of euclidean distances of each coordinate in coords_1 to each coordinate in coords_2
     TODO: probably faster to do upper triangle += transpose
@@ -73,7 +73,7 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, euclidean=F
         shape = (n, 3)
     coords_2
         shape = (m, 3)
-    euclidean
+    tm_score
     normalize
     Returns
     -------
@@ -83,11 +83,14 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, euclidean=F
     gamma = 0.3
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
-            if euclidean:
-                distance_matrix[i, j] = np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1))
+            if tm_score:
+                d0 = 1.24 * (min(coords_1.shape[0], coords_2.shape[0]) - 15) ** (1 / 3) - 1.8
+                distance_matrix[i, j] = 1 / (1 + np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1) / d0 ** 2)
+                # distance_matrix[i, j] = np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1))
             else:
                 # distance_matrix[i, j] = 1 / (1 + np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1)))
-                distance_matrix[i, j] = np.exp(-gamma * np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1)))
+                distance_matrix[i, j] = np.exp(
+                    -gamma * np.sqrt(np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1)))  # / (0.01*max(coords_1.shape[0], coords_2.shape[0])))
     if normalize:
         return helper.normalize(distance_matrix)
     else:

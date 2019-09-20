@@ -28,6 +28,32 @@ def get_mean_coords(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) -> np.nd
     return mean_coords
 
 
+@nb.njit
+def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) -> np.ndarray:
+    """
+    Mean of two coordinate sets (of the same shape)
+
+    Parameters
+    ----------
+    aln_coords_1
+    aln_coords_2
+
+    Returns
+    -------
+    mean_coords
+    """
+    mean_coords = np.zeros(aln_coords_1.shape)
+    for i in range(aln_coords_1.shape[0]):
+        mean_coords[i, :-1] = np.array([np.nanmean(np.array([aln_coords_1[i, x], aln_coords_2[i, x]])) for x in range(aln_coords_1.shape[1] - 1)])
+        if not np.isnan(aln_coords_1[i, 0]):
+            mean_coords[i, -1] += aln_coords_1[i, -1]
+        if not np.isnan(aln_coords_2[i, 0]):
+            mean_coords[i, -1] += aln_coords_2[i, -1]
+        if not (np.isnan(aln_coords_1[i, 0]) or np.isnan(aln_coords_2[i, 0])):
+            mean_coords[i, -1] += 20
+    return mean_coords
+
+
 def get_fraction_aligned(coords_1, coords_2, threshold=3.5):
     """
     Number of residue pairs which are closer than threshold in superimposed structure pair
@@ -91,20 +117,22 @@ class StructureMultiple:
         pairwise_coverage[:] = np.nan
         pairwise_frac_matrix = np.zeros((num, num))
         pairwise_frac_matrix[:] = np.nan
+        pairwise_tm_matrix = np.zeros((num, num))
+        pairwise_tm_matrix[:] = np.nan
         if superimpose_first:
             structures = [psa.Structure(self.structures[0].name,
                                         self.structures[0].sequence,
-                                        self.structures[0].coords,
-                                        self.structures[0].features)]
+                                        self.structures[0].coords[:, :3],
+                                        self.structures[0].features, add_column=False)]
             for s in self.structures[1:]:
                 pos_1, pos_2 = helper.get_common_positions(helper.aligned_string_to_array(alignments[structures[0].name]),
                                                            helper.aligned_string_to_array(alignments[s.name]))
-                common_coords_1, common_coords_2 = structures[0].coords[pos_1], s.coords[pos_2]
+                common_coords_1, common_coords_2 = structures[0].coords[pos_1][:, :3], s.coords[pos_2][:, :3]
                 rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
-                coords_2 = rmsd_calculations.apply_rotran(s.coords, rotation_matrix, translation_matrix)
-                structures.append(psa.Structure(s.name, s.sequence, coords_2, s.features))
+                coords_2 = rmsd_calculations.apply_rotran(s.coords[:, :3], rotation_matrix, translation_matrix)
+                structures.append(psa.Structure(s.name, s.sequence, coords_2, s.features, add_column=False))
         else:
-            structures = [s for s in self.structures]
+            structures = [psa.Structure(s.name, s.sequence, s.coords[:, :3], s.features, add_column=False) for s in self.structures]
         for i in range(num):
             for j in range(i + 1, num):
                 name_1, name_2 = structures[i].name, structures[j].name
@@ -116,15 +144,16 @@ class StructureMultiple:
                     aln_1 = alignments[name_1]
                     aln_2 = alignments[name_2]
                 common_coords_1, common_coords_2 = structure_pair.get_common_coordinates(aln_1, aln_2)
+                # print(common_coords_1.shape, common_coords_2.shape)
                 assert common_coords_1.shape[0] > 0
                 if not superimpose_first:
                     rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
                     common_coords_2 = rmsd_calculations.apply_rotran(common_coords_2, rot, tran)
-                frac = get_fraction_aligned(common_coords_1, common_coords_2)
                 pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
                 pairwise_coverage[i, j] = pairwise_coverage[j, i] = common_coords_1.shape[0] / len(aln_1)
-                pairwise_frac_matrix[i, j] = pairwise_frac_matrix[j, i] = frac
-        return pairwise_rmsd_matrix, pairwise_coverage, pairwise_frac_matrix
+                pairwise_frac_matrix[i, j] = pairwise_frac_matrix[j, i] = get_fraction_aligned(common_coords_1, common_coords_2)
+                pairwise_tm_matrix[i, j] = pairwise_tm_matrix[j, i] = structure_pair.get_tm_score(aln_1, aln_2, False)
+        return pairwise_rmsd_matrix, pairwise_coverage, pairwise_frac_matrix, pairwise_tm_matrix
 
     def make_pairwise_dtw_rmsd_matrix(self, alignments: dict, superimpose: bool = True, gap_open_penalty: float = 0.,
                                       gap_extend_penalty: float = 0.):
@@ -157,10 +186,11 @@ class StructureMultiple:
                                                                                      superimpose=superimpose,
                                                                                      gap_open_penalty=gap_open_penalty,
                                                                                      gap_extend_penalty=gap_extend_penalty)
-                rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
-                print(rmsd_class.rmsd)
-                pairwise_rmsd_matrix[i, j] = rmsd_class.rmsd
-                pairwise_coverage[i, j] = pairwise_coverage[j, i] = rmsd_class.coverage_aln
+                # rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
+                # print(rmsd_class.rmsd)
+
+                pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score  # structure_pair.get_tm_score(dtw_aln_1, dtw_aln_2) rmsd_class.rmsd
+                # pairwise_coverage[i, j] = pairwise_coverage[j, i] = rmsd_class.coverage_aln
                 # pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score
                 # pairwise_coverage[i, j] = pairwise_coverage[j, i] =
         return pairwise_rmsd_matrix, pairwise_coverage
@@ -273,7 +303,10 @@ class StructureMultiple:
             assert tree[x + 1, 1] == node_int
             make_intermediate_node(node_1, node_2, node_int)
 
-        node_1, node_2 = tree[-1, 0], tree[-1, 1]
+        if len(self.structures) == 3:
+            node_1, node_2 = tree[0, 0], tree[0, 1]
+        else:
+            node_1, node_2 = tree[-1, 0], tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
         return {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}
 
@@ -299,20 +332,22 @@ class StructureMultiple:
         """
         self.final_structures = [s for s in self.structures]
         alignments = {k: helper.aligned_string_to_array(alignments[k]) for k in alignments}
-        pw_rmsd_matrix, pw_cov_matrix = self.make_pairwise_dtw_rmsd_matrix(alignments,
-                                                                           gap_open_penalty=gap_open_penalty,
-                                                                           gap_extend_penalty=gap_extend_penalty,
-                                                                           superimpose=superimpose)
-        pw_matrix = (pw_rmsd_matrix - np.min(pw_rmsd_matrix)) / (np.max(pw_rmsd_matrix) - np.min(pw_rmsd_matrix))
-        pw_matrix *= (1 - pw_cov_matrix)
+        pw_matrix, pw_cov_matrix = self.make_pairwise_dtw_rmsd_matrix(alignments,
+                                                                      gap_open_penalty=gap_open_penalty,
+                                                                      gap_extend_penalty=gap_extend_penalty,
+                                                                      superimpose=superimpose)
+        # pw_matrix = helper.normalize(pw_rmsd_matrix)
+        # pw_matrix *= (1 - pw_cov_matrix)
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
         msa_alignments = {s.name: {s.name: s.sequence} for s in self.final_structures}
+        maximums = 0
 
         def make_intermediate_node(n1, n2, n_int):
             name_1, name_2 = self.final_structures[n1].name, self.final_structures[n2].name
             name_int = f"int-{n_int}"
+            self.final_structures[n2].coords[:, -1] = maximums
             aln_coords_1, aln_coords_2, dtw_aln_1, dtw_aln_2 = self._get_i_j_alignment(n1, n2, alignments[name_1], alignments[name_2],
                                                                                        gap_open_penalty=gap_open_penalty,
                                                                                        gap_extend_penalty=gap_extend_penalty,
@@ -323,15 +358,18 @@ class StructureMultiple:
                                       msa_alignments[name_2].items()}
             msa_alignments[name_int] = {**msa_alignments[name_1], **msa_alignments[name_2]}
 
-            mean_coords = get_mean_coords(aln_coords_1, aln_coords_2)
+            mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2)
             self.final_structures.append(psa.Structure(name_int, None, mean_coords, self.final_structures[n1].features))
             alignments[name_int] = alignments[name_1]
+            return np.max(mean_coords[:, -1])
 
         for x in range(0, self.tree.shape[0] - 1, 2):
             node_1, node_2, node_int = self.tree[x, 0], self.tree[x + 1, 0], self.tree[x, 1]
             assert self.tree[x + 1, 1] == node_int
-            make_intermediate_node(node_1, node_2, node_int)
-
-        node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
+            maximums = make_intermediate_node(node_1, node_2, node_int)
+        if len(self.structures) == 3:
+            node_1, node_2 = self.tree[0, 0], self.tree[0, 1]
+        else:
+            node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
         return {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}

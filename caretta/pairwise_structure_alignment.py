@@ -1,6 +1,5 @@
 import typing
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from caretta import dynamic_time_warping as dtw
@@ -19,10 +18,14 @@ class RMSD:
 
 
 class Structure:
-    def __init__(self, name: str, sequence: typing.Union[str, None], coords: np.ndarray, features, make_feature_matrix=False, feature_names=()):
+    def __init__(self, name: str, sequence: typing.Union[str, None], coords: np.ndarray, features, make_feature_matrix=False, feature_names=(),
+                 add_column=True):
         self.name = name
         self.sequence = sequence
-        self.coords = coords
+        if add_column:
+            self.coords = np.hstack((coords, np.zeros((coords.shape[0], 1))))
+        else:
+            self.coords = coords
         if make_feature_matrix:
             self.features = self.get_feature_matrix(features, feature_names)
         else:
@@ -97,9 +100,29 @@ class StructurePair:
             rmsd = 999
         return RMSD(rmsd, common_coords_1.shape[0], aln_array_1, aln_array_2, gap=gap)
 
+    def get_tm_score(self, aln_array_1, aln_array_2, superimpose=True):
+        common_coords_1, common_coords_2 = self.get_common_coordinates(aln_array_1, aln_array_2)
+        if superimpose:
+            rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
+            common_coords_2 = rmsd_calculations.apply_rotran(common_coords_2, rotation_matrix, translation_matrix)
+        l_min = min(self.structure_1.coords.shape[0], self.structure_2.coords.shape[0])
+        if l_min > 21:
+            d0 = 1.24 * (l_min - 15) ** (1 / 3) - 1.8
+        else:
+            d0 = 0.5
+        return (1 / l_min) * sum(
+            1 / (1 + (np.sum((common_coords_1[i] - common_coords_2[i]) ** 2, axis=-1) / d0) ** 2) for i in range(common_coords_1.shape[0]))
+
     def get_dtw_feature_alignment(self, gap_open_feature: float = 1., gap_extend_feature: float = 1):
         distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_feature, gap_extend_feature)
+        # pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
+        # plt.figure(figsize=(10, 10))
+        # plt.imshow(distance_matrix, interpolation="nearest")
+        # plt.colorbar()
+        # plt.scatter(pos_2, pos_1, c='red', s=10, alpha=0.5)
+        #
+        # plt.pause(0.0001)
         return dtw_aln_array_1, dtw_aln_array_2, score
 
     def get_dtw_feature_coord_alignment(self, gap_open_feature: float = 1., gap_extend_feature: float = 1., gap_open_coord: float = 10.,
@@ -136,13 +159,23 @@ class StructurePair:
             coords_2 = rmsd_calculations.apply_rotran(self.structure_2.coords, rotation_matrix, translation_matrix)
         else:
             coords_2 = self.structure_2.coords
-        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, normalize=False)
+        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, tm_score=False, normalize=False)
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
-        pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
-        plt.figure(figsize=(10, 10))
-        plt.imshow(distance_matrix, interpolation="nearest")
-        plt.colorbar()
-        plt.scatter(pos_2, pos_1, c='red', s=10, alpha=0.5)
+        if superimpose:
+            for i in range(3):
+                pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
+                common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
+                rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
+                self.structure_2.coords = rmsd_calculations.apply_rotran(self.structure_2.coords, rotation_matrix, translation_matrix)
+                distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, self.structure_2.coords, tm_score=False,
+                                                                         normalize=False)
+                dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
 
-        plt.pause(0.0001)
+        # pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
+        # plt.figure(figsize=(10, 10))
+        # plt.imshow(distance_matrix, interpolation="nearest")
+        # plt.colorbar()
+        # plt.scatter(pos_2, pos_1, c='red', s=10, alpha=0.5)
+        #
+        # plt.pause(0.0001)
         return dtw_aln_array_1, dtw_aln_array_2, score
