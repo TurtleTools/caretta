@@ -109,7 +109,11 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
 def get_exp_distances(coords_1: np.ndarray, coords_2: np.ndarray, gamma=0.3) -> float:
     """
     """
-    return np.sum(np.exp(-gamma * (coords_1 - coords_2) ** 2))
+    score = 0
+    for i in range(coords_1.shape[0]):
+        score += np.exp(
+            -gamma * np.sqrt(np.sum((coords_1[i] - coords_2[i]) ** 2, axis=-1)))
+    return score / coords_1.shape[0]
 
 
 @nb.njit

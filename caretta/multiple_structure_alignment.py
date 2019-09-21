@@ -189,6 +189,7 @@ class StructureMultiple:
                                                                                      superimpose=superimpose,
                                                                                      gap_open_penalty=gap_open_penalty,
                                                                                      gap_extend_penalty=gap_extend_penalty)
+                # rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
                 score = structure_pair.get_exp_distances(dtw_aln_1, dtw_aln_2)
                 x1, x2 = len(self.structures[i].sequence), len(self.structures[j].sequence)
                 f1 = 2 * x1 * x2 / (x1 + x2)
