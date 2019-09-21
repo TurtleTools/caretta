@@ -190,7 +190,8 @@ class StructureMultiple:
                 # rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
                 # print(rmsd_class.rmsd)
 
-                pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score
+                pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score / max(1, np.abs(
+                    len(self.structures[i].sequence) - len(self.structures[j].sequence)))
                 # pairwise_coverage[i, j] = pairwise_coverage[j, i] = rmsd_class.coverage_aln
                 # pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score
                 # pairwise_coverage[i, j] = pairwise_coverage[j, i] =
