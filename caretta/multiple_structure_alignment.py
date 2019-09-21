@@ -350,10 +350,11 @@ class StructureMultiple:
             name_1, name_2 = self.final_structures[n1].name, self.final_structures[n2].name
             name_int = f"int-{n_int}"
             self.final_structures[n2].coords[:, -1] = maximums
+            print(name_1, name_2)
             if name_1.startswith("int") or name_2.startswith("int"):
-                plot = False
+                plot = True
             else:
-                plot = False
+                plot = True
             aln_coords_1, aln_coords_2, aln_features_1, aln_features_2, dtw_aln_1, dtw_aln_2 = self._get_i_j_alignment(n1, n2, alignments[name_1],
                                                                                                                        alignments[name_2],
                                                                                                                        gap_open_penalty=gap_open_penalty,
