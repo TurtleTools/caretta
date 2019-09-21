@@ -1,6 +1,7 @@
 import typing
 
 import matplotlib.pyplot as plt
+import numba as nb
 import numpy as np
 from scipy import ndimage
 
@@ -19,13 +20,17 @@ class RMSD:
         self.aln_sequence_2 = aln_sequence_2
 
 
+def string_to_array(secondary):
+    return np.array(secondary, dtype='S1').view(np.int8)
+
+
 class Structure:
     def __init__(self, name: str, sequence: typing.Union[str, None], coords: np.ndarray, secondary, features, make_feature_matrix=False,
                  feature_names=(),
                  add_column=True):
         self.name = name
         self.sequence = sequence
-        self.secondary = np.array(secondary, dtype='U1').reshape(-1, 1)
+        self.secondary = secondary
         if add_column:
             self.coords = np.hstack((coords, np.zeros((coords.shape[0], 1))))
 
@@ -51,8 +56,8 @@ class Structure:
         return feature_matrix
 
 
-# @nb.njit
-def get_secondary_distance_matrix(secondary_1, secondary_2, gap=''):
+@nb.njit
+def get_secondary_distance_matrix(secondary_1, secondary_2, gap=0):
     score_matrix = np.zeros((secondary_1.shape[0], secondary_2.shape[0]))
     for i in range(secondary_1.shape[0]):
         for j in range(secondary_2.shape[0]):
@@ -166,6 +171,43 @@ class StructurePair:
         feature_aln_1, feature_aln_2, score = self.get_dtw_feature_alignment(gap_open_feature, gap_extend_feature)
         return self.get_dtw_coord_alignment(feature_aln_1, feature_aln_2, gap_open_coord, gap_extend_coord)
 
+    def get_dtw_coord_secondary_alignment(self, gap_open_sec=3, gap_extend_sec=1,
+                                          gap_open_penalty: float = 0.,
+                                          gap_extend_penalty=0.,
+                                          superimpose: bool = True, plot=False):
+        distance_matrix = get_secondary_distance_matrix(self.structure_1.secondary, self.structure_2.secondary)
+        aln_array_1, aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_sec, gap_extend_sec)
+        coords_2 = self.structure_2.coords.copy()
+        if superimpose:
+            pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2)
+            common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
+            rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
+            coords_2[:, :3] = rmsd_calculations.apply_rotran(self.structure_2.coords[:, :3], rotation_matrix, translation_matrix)
+        # feature_distance_matrix = 0. * rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
+        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, tm_score=False, normalize=False)
+        # distance_matrix += feature_distance_matrix
+        dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
+        if superimpose:
+            for i in range(3):
+                pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
+                common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
+                rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
+                self.structure_2.coords[:, :3] = rmsd_calculations.apply_rotran(self.structure_2.coords[:, :3],
+                                                                                rotation_matrix, translation_matrix)
+                distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, self.structure_2.coords, tm_score=False,
+                                                                         normalize=False)
+                # distance_matrix += feature_distance_matrix
+                dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
+        if plot:
+            pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
+            plt.figure(figsize=(10, 10))
+            plt.imshow(distance_matrix, interpolation="nearest")
+            plt.colorbar()
+            plt.scatter(pos_2, pos_1, c='red', s=10, alpha=0.5)
+
+            plt.pause(0.0001)
+        return dtw_aln_array_1, dtw_aln_array_2, score
+
     def get_dtw_coord_alignment(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty=0.,
                                 superimpose: bool = True, plot=False):
         """
@@ -194,9 +236,9 @@ class StructurePair:
             common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
             coords_2[:, :3] = rmsd_calculations.apply_rotran(self.structure_2.coords[:, :3], rotation_matrix, translation_matrix)
-        feature_distance_matrix = 0. * rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
+        # feature_distance_matrix = 0. * rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
         distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, tm_score=False, normalize=False)
-        distance_matrix += feature_distance_matrix
+        # distance_matrix += feature_distance_matrix
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         if superimpose:
             for i in range(3):
@@ -207,7 +249,7 @@ class StructurePair:
                                                                                 rotation_matrix, translation_matrix)
                 distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, self.structure_2.coords, tm_score=False,
                                                                          normalize=False)
-                distance_matrix += feature_distance_matrix
+                # distance_matrix += feature_distance_matrix
                 dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         if plot:
             pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)

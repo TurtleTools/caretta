@@ -80,7 +80,7 @@ def get_structures(pdb_dir, dssp_dir, feature_names):
     sequences = get_sequences(pdbs)
     coordinates = [pdbs[n][helper.get_beta_indices(pdbs[n])].getCoords().astype(np.float64) for n in names]
     features = feature_extraction.get_dssp_features_multiple([str(pdb_dir / f"{name}.ent") for name in names], str(dssp_dir))
-    structures = [psa.Structure(names[i], sequences[names[i]], coordinates[i], features[i]["secondary"], features[i],
+    structures = [psa.Structure(names[i], sequences[names[i]], coordinates[i], psa.string_to_array(features[i]["secondary"]), features[i],
                                 make_feature_matrix=True, feature_names=feature_names) for i in range(len(names))]
     return structures
 

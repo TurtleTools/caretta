@@ -55,7 +55,8 @@ def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray, ad
     return mean_coords
 
 
-def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap='') -> np.ndarray:
+@nb.njit
+def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap=0) -> np.ndarray:
     """
     Mean of two coordinate sets (of the same shape)
 
@@ -240,6 +241,41 @@ class StructureMultiple:
                 # pairwise_coverage[i, j] = pairwise_coverage[j, i] =
         return pairwise_rmsd_matrix, pairwise_coverage
 
+    def make_pairwise_sec_dtw_score_matrix(self, gap_open_sec=1, gap_extend_sec=0.1, superimpose: bool = True, gap_open_penalty: float = 0.,
+                                           gap_extend_penalty: float = 0.):
+        """
+        Find RMSDs of pairwise alignment of each pair of sequences
+
+        Parameters
+        ----------
+        superimpose
+            if True then superimposes data using alignments before running DTW
+        gap_open_penalty
+            penalty for opening a (series of) gap(s)
+        gap_extend_penalty
+            penalty for extending an existing series of gaps
+
+        Returns
+        -------
+        RMSD matrix, coverage matrix
+        """
+        num = self.num_structures
+        pairwise_rmsd_matrix = np.zeros((num, num))
+        pairwise_coverage = np.zeros((num, num))
+        for i in range(num):
+            for j in range(i, num):
+                structure_pair = psa.StructurePair(self.structures[i], self.structures[j])
+                dtw_aln_1, dtw_aln_2, score = structure_pair.get_dtw_coord_secondary_alignment(gap_open_sec=gap_open_sec,
+                                                                                               gap_extend_sec=gap_extend_sec,
+                                                                                               superimpose=superimpose,
+                                                                                               gap_open_penalty=gap_open_penalty,
+                                                                                               gap_extend_penalty=gap_extend_penalty)
+                score = structure_pair.get_exp_distances(dtw_aln_1, dtw_aln_2)
+                x1, x2 = len(self.structures[i].sequence), len(self.structures[j].sequence)
+                f1 = 2 * x1 * x2 / (x1 + x2)
+                pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score * f1
+        return pairwise_rmsd_matrix, pairwise_coverage
+
     def _get_i_j_alignment(self, i: int, j: int, aln_array_1: np.ndarray, aln_array_2: np.ndarray,
                            gap_open_penalty: float,
                            gap_extend_penalty: float,
@@ -282,9 +318,32 @@ class StructureMultiple:
             coords_2 = structure_pair.structure_2.coords
         aln_coords_1 = helper.get_aligned_data(dtw_aln_1, structure_pair.structure_1.coords, -1)
         aln_coords_2 = helper.get_aligned_data(dtw_aln_2, coords_2, -1)
-        aln_features_1 = helper.get_aligned_data(dtw_aln_1, structure_pair.structure_1.features, -1)
-        aln_features_2 = helper.get_aligned_data(dtw_aln_2, structure_pair.structure_2.features, -1)
-        return aln_coords_1, aln_coords_2, aln_features_1, aln_features_2, dtw_aln_1, dtw_aln_2
+        return aln_coords_1, aln_coords_2, dtw_aln_1, dtw_aln_2
+
+    def _get_i_j_sec_alignment(self, i: int, j: int, gap_open_sec, gap_extend_sec,
+                               gap_open_penalty: float,
+                               gap_extend_penalty: float,
+                               superimpose: bool = True, plot=False):
+        structure_pair = psa.StructurePair(self.final_structures[i], self.final_structures[j])
+        dtw_aln_1, dtw_aln_2, _ = structure_pair.get_dtw_coord_secondary_alignment(
+            gap_open_sec=gap_open_sec,
+            gap_extend_sec=gap_extend_sec,
+            gap_open_penalty=gap_open_penalty,
+            gap_extend_penalty=gap_extend_penalty,
+            plot=plot)
+        if superimpose:
+            common_coords_1, common_coords_2 = structure_pair.get_common_coordinates(dtw_aln_1, dtw_aln_2)
+            rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
+            coords_2 = rmsd_calculations.apply_rotran(structure_pair.structure_2.coords, rot, tran)
+        else:
+            coords_2 = structure_pair.structure_2.coords
+        aln_coords_1 = helper.get_aligned_data(dtw_aln_1, structure_pair.structure_1.coords, -1)
+        aln_coords_2 = helper.get_aligned_data(dtw_aln_2, coords_2, -1)
+        # aln_features_1 = helper.get_aligned_data(dtw_aln_1, structure_pair.structure_1.features, -1)
+        # aln_features_2 = helper.get_aligned_data(dtw_aln_2, structure_pair.structure_2.features, -1)
+        aln_sec_1 = helper.get_aligned_string_data(dtw_aln_1, structure_pair.structure_1.secondary, -1)
+        aln_sec_2 = helper.get_aligned_string_data(dtw_aln_2, structure_pair.structure_2.secondary, -1)
+        return aln_coords_1, aln_coords_2, aln_sec_1, aln_sec_2, dtw_aln_1, dtw_aln_2
 
     def _get_i_j_feature_alignment(self, i: int, j: int, aln_1: np.ndarray = None, aln_2: np.ndarray = None, gap_open_penalty: float = 1.,
                                    gap_extend_penalty: float = 1.):
@@ -415,7 +474,7 @@ class StructureMultiple:
                                       msa_alignments[name_2].items()}
             msa_alignments[name_int] = {**msa_alignments[name_1], **msa_alignments[name_2]}
 
-            mean_sec = get_mean_secondary(aln_coords_1, aln_coords_2, '')
+            mean_sec = get_mean_secondary(aln_coords_1, aln_coords_2, 0)
             structure = psa.Structure(name_int, None, self.final_structures[n1].coords, mean_sec, self.final_structures[n1].features,
                                       add_column=False)
             self.final_structures.append(structure)
@@ -471,12 +530,12 @@ class StructureMultiple:
                 plot = False
             else:
                 plot = False
-            aln_coords_1, aln_coords_2, aln_features_1, aln_features_2, dtw_aln_1, dtw_aln_2 = self._get_i_j_alignment(n1, n2, alignments[name_1],
-                                                                                                                       alignments[name_2],
-                                                                                                                       gap_open_penalty=gap_open_penalty,
-                                                                                                                       gap_extend_penalty=gap_extend_penalty,
-                                                                                                                       superimpose=superimpose,
-                                                                                                                       plot=plot)
+            aln_coords_1, aln_coords_2, dtw_aln_1, dtw_aln_2 = self._get_i_j_alignment(n1, n2, alignments[name_1],
+                                                                                       alignments[name_2],
+                                                                                       gap_open_penalty=gap_open_penalty,
+                                                                                       gap_extend_penalty=gap_extend_penalty,
+                                                                                       superimpose=superimpose,
+                                                                                       plot=plot)
             msa_alignments[name_1] = {name: "".join([sequence[i] if i != -1 else '-' for i in dtw_aln_1]) for name, sequence in
                                       msa_alignments[name_1].items()}
             msa_alignments[name_2] = {name: "".join([sequence[i] if i != -1 else '-' for i in dtw_aln_2]) for name, sequence in
@@ -485,10 +544,60 @@ class StructureMultiple:
 
             mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2, 1)
 
-            mean_features = get_mean_coords_extra(aln_features_1, aln_features_2, 0.)
             self.final_structures.append(
-                psa.Structure(name_int, None, mean_coords, self.final_structures[n1].secondary, mean_features, add_column=False))
+                psa.Structure(name_int, None, mean_coords, self.final_structures[n1].secondary, self.final_structures[n1].features, add_column=False))
             alignments[name_int] = alignments[name_1]
+            return np.max(mean_coords[:, -1])
+
+        for x in range(0, self.tree.shape[0] - 1, 2):
+            node_1, node_2, node_int = self.tree[x, 0], self.tree[x + 1, 0], self.tree[x, 1]
+            assert self.tree[x + 1, 1] == node_int
+            maximums = make_intermediate_node(node_1, node_2, node_int)
+        node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
+        make_intermediate_node(node_1, node_2, "final")
+        return {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}
+
+    def align_sec(self, gap_open_sec=3, gap_extend_sec=1, gap_open_penalty: float = 10., gap_extend_penalty: float = 5,
+                  superimpose: bool = True) -> dict:
+        self.final_structures = [s for s in self.structures]
+        pw_matrix, pw_cov_matrix = self.make_pairwise_sec_dtw_score_matrix(gap_open_sec=gap_open_sec,
+                                                                           gap_extend_sec=gap_extend_sec,
+                                                                           gap_open_penalty=gap_open_penalty,
+                                                                           gap_extend_penalty=gap_extend_penalty,
+                                                                           superimpose=superimpose)
+        tree, branch_lengths = nj.neighbor_joining(pw_matrix, np.array([len(s.sequence) for s in self.structures]))
+        self.tree = tree
+        self.branch_lengths = branch_lengths
+        msa_alignments = {s.name: {s.name: s.sequence} for s in self.final_structures}
+        maximums = 0
+
+        def make_intermediate_node(n1, n2, n_int):
+            name_1, name_2 = self.final_structures[n1].name, self.final_structures[n2].name
+            name_int = f"int-{n_int}"
+            self.final_structures[n2].coords[:, -1] = maximums
+            # print(name_1, name_2)
+            if name_1.startswith("int") or name_2.startswith("int"):
+                plot = False
+            else:
+                plot = False
+            aln_coords_1, aln_coords_2, aln_features_1, aln_features_2, dtw_aln_1, dtw_aln_2 = self._get_i_j_sec_alignment(n1, n2,
+                                                                                                                           gap_open_sec=gap_open_sec,
+                                                                                                                           gap_extend_sec=gap_extend_sec,
+                                                                                                                           gap_open_penalty=gap_open_penalty,
+                                                                                                                           gap_extend_penalty=gap_extend_penalty,
+                                                                                                                           superimpose=superimpose,
+                                                                                                                           plot=plot)
+            msa_alignments[name_1] = {name: "".join([sequence[i] if i != -1 else '-' for i in dtw_aln_1]) for name, sequence in
+                                      msa_alignments[name_1].items()}
+            msa_alignments[name_2] = {name: "".join([sequence[i] if i != -1 else '-' for i in dtw_aln_2]) for name, sequence in
+                                      msa_alignments[name_2].items()}
+            msa_alignments[name_int] = {**msa_alignments[name_1], **msa_alignments[name_2]}
+
+            mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2, 1)
+
+            mean_sec = get_mean_secondary(aln_features_1, aln_features_2, 0)
+            self.final_structures.append(
+                psa.Structure(name_int, None, mean_coords, mean_sec, self.final_structures[n1].features, add_column=False))
             return np.max(mean_coords[:, -1])
 
         for x in range(0, self.tree.shape[0] - 1, 2):
