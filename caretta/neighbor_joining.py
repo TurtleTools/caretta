@@ -38,7 +38,7 @@ def neighbor_joining(distance_matrix: np.ndarray, lengths: np.ndarray) -> (np.nd
     num_intermediate_nodes = 0
     while n > 3:
         # indices of nodes to be joined (according to the current distance_matrix, not the initial one!)
-        min_ij = _find_join_nodes(distance_matrix)
+        min_ij = _find_join_nodes(distance_matrix, lengths)
         # branch lengths of each node being joined to the new node created after they are joined
         delta_ij_u = _find_branch_length(distance_matrix, min_ij[0], min_ij[1])
 
@@ -89,7 +89,7 @@ def neighbor_joining(distance_matrix: np.ndarray, lengths: np.ndarray) -> (np.nd
 
 # Q matrix calculation + minimum i, j (step 1 & 2)
 @nb.njit
-def _find_join_nodes(distance_matrix):
+def _find_join_nodes(distance_matrix, lengths):
     """
     Finds which nodes to join next
 
@@ -109,10 +109,10 @@ def _find_join_nodes(distance_matrix):
     for i in range(n):
         for j in range(n):
             if i != j:
-                q_matrix[i, j] = distance_matrix[i, j] - np.sum(distance_matrix[i, :] * distance_matrix[j, :]) / np.sqrt(
-                    np.sum(distance_matrix[i, :] ** 2) * np.sum(distance_matrix[j, :] ** 2))
+                # q_matrix[i, j] = distance_matrix[i, j] - np.sum(distance_matrix[i, :] * distance_matrix[j, :]) / np.sqrt(
+                #     np.sum(distance_matrix[i, :] ** 2) * np.sum(distance_matrix[j, :] ** 2))
                 # q_matrix[i, j] = (n - 2) * distance_matrix[i, j] - np.sum(distance_matrix[i, :]) - np.sum(distance_matrix[j, :])
-                # q_matrix[i, j] = distance_matrix[i, j]
+                q_matrix[i, j] = distance_matrix[i, j] / min(1, np.abs(lengths[i] - lengths[j]))
                 if q_matrix[i, j] < min_q:
                     min_ij[0], min_ij[1] = i, j
                     min_q = q_matrix[i, j]

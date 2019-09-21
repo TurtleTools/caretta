@@ -165,7 +165,6 @@ class StructurePair:
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
             coords_2[:, :3] = rmsd_calculations.apply_rotran(self.structure_2.coords[:, :3], rotation_matrix, translation_matrix)
         feature_distance_matrix = 0. * rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
-        # print(feature_distance_matrix.shape)
         distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, tm_score=False, normalize=False)
         distance_matrix += feature_distance_matrix
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)

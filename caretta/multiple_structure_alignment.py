@@ -283,7 +283,7 @@ class StructureMultiple:
     def align_features(self, gap_open_penalty: float = 1., gap_extend_penalty: float = 1.) -> dict:
         self.final_structures = [s for s in self.structures]
         pw_matrix, pw_alns = self.make_pairwise_dtw_score_matrix(gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty)
-        tree, branch_lengths = nj.neighbor_joining(pw_matrix)
+        tree, branch_lengths = nj.neighbor_joining(pw_matrix, np.array([len(s.sequence) for s in self.structures]))
         msa_alignments = {s.name: {s.name: s.sequence} for s in self.final_structures}
 
         def make_intermediate_node(n1, n2, n_int):
