@@ -106,6 +106,13 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
 
 
 @nb.njit
+def get_exp_distances(coords_1: np.ndarray, coords_2: np.ndarray, gamma=0.3) -> float:
+    """
+    """
+    return np.sum(np.exp(-gamma * (coords_1 - coords_2) ** 2))
+
+
+@nb.njit
 def get_rmsd_superimposed(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
     """
     RMSD of paired coordinates after SVD superimposing

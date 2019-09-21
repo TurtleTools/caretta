@@ -106,6 +106,14 @@ class StructurePair:
             rmsd = 999
         return RMSD(rmsd, common_coords_1.shape[0], aln_array_1, aln_array_2, gap=gap)
 
+    def get_exp_distances(self, aln_array_1, aln_array_2):
+        common_coords_1, common_coords_2 = self.get_common_coordinates(aln_array_1, aln_array_2)
+        return rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2)
+
+    def get_exp_feature_distances(self, aln_array_1, aln_array_2):
+        pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2, -1)
+        return rmsd_calculations.get_exp_distances(self.structure_1.features[pos_1], self.structure_2.features[pos_2])
+
     def get_tm_score(self, aln_array_1, aln_array_2, superimpose=True):
         common_coords_1, common_coords_2 = self.get_common_coordinates(aln_array_1, aln_array_2)
         if superimpose:
