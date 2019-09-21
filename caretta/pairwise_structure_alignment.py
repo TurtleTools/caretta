@@ -108,7 +108,7 @@ class StructurePair:
 
     def get_exp_distances(self, aln_array_1, aln_array_2):
         common_coords_1, common_coords_2 = self.get_common_coordinates(aln_array_1, aln_array_2)
-        return rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2)
+        return rmsd_calculations.get_exp_distances(common_coords_1[:, :3], common_coords_2[:, :3])
 
     def get_exp_feature_distances(self, aln_array_1, aln_array_2):
         pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2, -1)

@@ -91,10 +91,7 @@ class StructureMultiple:
                 structure_pair = psa.StructurePair(self.structures[i], self.structures[j])
                 dtw_aln_1, dtw_aln_2, score = structure_pair.get_dtw_feature_alignment(gap_open_feature=gap_open_penalty,
                                                                                        gap_extend_feature=gap_extend_penalty)
-                score = structure_pair.get_exp_feature_distances(dtw_aln_1, dtw_aln_2)
-                x1, x2 = len(self.structures[i].sequence), len(self.structures[j].sequence)
-                f1 = 2 * x1 * x2 / (x1 + x2)
-                pairwise_matrix[i, j] = pairwise_matrix[j, i] = -score * f1
+                pairwise_matrix[i, j] = pairwise_matrix[j, i] = -score
                 pairwise_alns[(name_1, name_2)] = (dtw_aln_1, dtw_aln_2)
                 pairwise_alns[(name_2, name_1)] = (dtw_aln_2, dtw_aln_1)
         return pairwise_matrix, pairwise_alns
@@ -190,6 +187,8 @@ class StructureMultiple:
                                                                                      gap_open_penalty=gap_open_penalty,
                                                                                      gap_extend_penalty=gap_extend_penalty)
                 # rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
+                rot, tran = rmsd_calculations.svd_superimpose(self.structures[i].coords[:, :3], self.structures[j].coords[:, 3])
+                self.structures[j].coords[:, :3] = rmsd_calculations.apply_rotran(self.structures[j].coords[:, 3], rot, tran)
                 score = structure_pair.get_exp_distances(dtw_aln_1, dtw_aln_2)
                 x1, x2 = len(self.structures[i].sequence), len(self.structures[j].sequence)
                 f1 = 2 * x1 * x2 / (x1 + x2)
