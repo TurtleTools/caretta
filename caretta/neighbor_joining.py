@@ -14,7 +14,7 @@ import numpy as np
 
 
 @nb.njit
-def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
+def neighbor_joining(distance_matrix: np.ndarray, lengths: np.ndarray) -> (np.ndarray, np.ndarray):
     """
     Runs the neighbor joining algorithm on a distance matrix
     Returns guide tree as adjacency list + branch lengths
@@ -22,6 +22,7 @@ def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
     Parameters
     ----------
     distance_matrix
+    lengths
 
     Returns
     -------

@@ -1,5 +1,6 @@
 import typing
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from caretta import dynamic_time_warping as dtw
@@ -136,7 +137,7 @@ class StructurePair:
         return self.get_dtw_coord_alignment(feature_aln_1, feature_aln_2, gap_open_coord, gap_extend_coord)
 
     def get_dtw_coord_alignment(self, aln_array_1: np.ndarray, aln_array_2: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty=0.,
-                                superimpose: bool = True):
+                                superimpose: bool = True, plot=False):
         """
         Aligns two sets of coordinates using dynamic time warping
         aln_array_1 and aln_array_2 are used to find the initial rotation/translation
@@ -163,7 +164,10 @@ class StructurePair:
             common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
             coords_2[:, :3] = rmsd_calculations.apply_rotran(self.structure_2.coords[:, :3], rotation_matrix, translation_matrix)
+        feature_distance_matrix = 0. * rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
+        # print(feature_distance_matrix.shape)
         distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, tm_score=False, normalize=False)
+        distance_matrix += feature_distance_matrix
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         if superimpose:
             for i in range(3):
@@ -174,13 +178,14 @@ class StructurePair:
                                                                                 rotation_matrix, translation_matrix)
                 distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, self.structure_2.coords, tm_score=False,
                                                                          normalize=False)
+                distance_matrix += feature_distance_matrix
                 dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
+        if plot:
+            pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
+            plt.figure(figsize=(10, 10))
+            plt.imshow(distance_matrix, interpolation="nearest")
+            plt.colorbar()
+            plt.scatter(pos_2, pos_1, c='red', s=10, alpha=0.5)
 
-        # pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
-        # plt.figure(figsize=(10, 10))
-        # plt.imshow(distance_matrix, interpolation="nearest")
-        # plt.colorbar()
-        # plt.scatter(pos_2, pos_1, c='red', s=10, alpha=0.5)
-        #
-        # plt.pause(0.0001)
+            plt.pause(0.0001)
         return dtw_aln_array_1, dtw_aln_array_2, score
