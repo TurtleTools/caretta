@@ -27,7 +27,32 @@ def get_gnm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
 def get_dssp_features_multiple(pdb_files, dssp_dir, num_threads=20):
     num_threads = min(len(pdb_files), num_threads)
     with multiprocessing.Pool(processes=num_threads) as pool:
-        return pool.starmap(get_dssp_features, [(pdb_file, dssp_dir) for pdb_file in pdb_files])
+        return pool.starmap(get_features, [(pdb_file, dssp_dir) for pdb_file in pdb_files])
+
+
+def get_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrite=False):
+    pdb_file = str(pdb_file)
+    _, name, _ = helper.get_file_parts(pdb_file)
+    protein = pd.parsePDB(pdb_file)
+    if rewrite_pdb:
+        pdb_file = str(Path(dssp_dir) / f"{name}.pdb")
+        pd.writePDB(pdb_file, protein)
+    dssp_file = Path(dssp_dir) / f"{name}.dssp"
+    if force_overwrite or not dssp_file.exists():
+        dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
+    protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
+    dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
+    dssp_labels = [label for label in protein.getDataLabels() if label.startswith("dssp") and label not in dssp_ignore]
+    data = {}
+    beta_indices = helper.get_beta_indices(protein)
+    indices = [protein[x].getData("dssp_resnum") for x in beta_indices]
+    for label in dssp_labels:
+        label_to_index = {i - 1: protein[x].getData(label) for i, x in zip(indices, beta_indices)}
+        data[f"{label}"] = np.array([label_to_index[i] if i in label_to_index else 0 for i in range(len(beta_indices))])
+    data["secondary"] = protein.getData("secondary")[beta_indices]
+    data["anm"] = get_anm_fluctuations(protein[beta_indices])
+    data["gnm"] = get_gnm_fluctuations(protein[beta_indices])
+    return data
 
 
 def get_dssp_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrite=False):

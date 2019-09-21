@@ -81,6 +81,14 @@ def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
     return aln_coords
 
 
+def get_aligned_string_data(aln_array, data, gap=-1):
+    pos = [i for i in range(len(aln_array)) if aln_array[i] != gap]
+    assert len(pos) == data.shape[0], f"{len(pos)}, {data.shape[0]}"
+    aln_coords = np.zeros((len(aln_array), data.shape[1]), dtype='U1')
+    aln_coords[pos] = data
+    return aln_coords
+
+
 def get_file_parts(input_filename: typing.Union[str, Path]) -> tuple:
     """
     Gets directory path, name, and extension from a filename

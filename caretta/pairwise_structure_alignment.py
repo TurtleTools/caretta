@@ -2,6 +2,7 @@ import typing
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy import ndimage
 
 from caretta import dynamic_time_warping as dtw
 from caretta import rmsd_calculations, helper
@@ -19,10 +20,12 @@ class RMSD:
 
 
 class Structure:
-    def __init__(self, name: str, sequence: typing.Union[str, None], coords: np.ndarray, features, make_feature_matrix=False, feature_names=(),
+    def __init__(self, name: str, sequence: typing.Union[str, None], coords: np.ndarray, secondary, features, make_feature_matrix=False,
+                 feature_names=(),
                  add_column=True):
         self.name = name
         self.sequence = sequence
+        self.secondary = np.array(secondary, dtype='U1').reshape(-1, 1)
         if add_column:
             self.coords = np.hstack((coords, np.zeros((coords.shape[0], 1))))
 
@@ -38,13 +41,27 @@ class Structure:
                 self.features = np.hstack((self.features, np.zeros((self.features.shape[0], 1))))
 
     def get_feature_matrix(self, dssp_features, feature_names):
+        feature_names = [f for f in feature_names if f != "secondary"]
         feature_matrix = np.zeros((self.coords.shape[0], len(feature_names)))
         pos = [x for x, s in enumerate(self.sequence) if s.upper() != 'X']
         for i, feature in enumerate(feature_names):
             feature_values = dssp_features[feature].astype(np.float64)[pos]
-            # feature_matrix[:, i] = ndimage.gaussian_filter1d(helper.normalize(feature_values), sigma=2)
-            feature_matrix[:, i] = helper.normalize(feature_values)
+            feature_matrix[:, i] = ndimage.gaussian_filter1d(helper.normalize(feature_values), sigma=2)
+            # feature_matrix[:, i] = helper.normalize(feature_values)
         return feature_matrix
+
+
+# @nb.njit
+def get_secondary_distance_matrix(secondary_1, secondary_2, gap=''):
+    score_matrix = np.zeros((secondary_1.shape[0], secondary_2.shape[0]))
+    for i in range(secondary_1.shape[0]):
+        for j in range(secondary_2.shape[0]):
+            if secondary_1[i] == secondary_2[j]:
+                if secondary_1[i] != gap:
+                    score_matrix[i, j] = 1
+            else:
+                score_matrix[i, j] = -1
+    return score_matrix
 
 
 class StructurePair:
@@ -126,6 +143,11 @@ class StructurePair:
             d0 = 0.5
         return (1 / l_min) * sum(
             1 / (1 + (np.sum((common_coords_1[i] - common_coords_2[i]) ** 2, axis=-1) / d0) ** 2) for i in range(common_coords_1.shape[0]))
+
+    def get_dtw_secondary_alignment(self, gap_open=1, gap_extend=1):
+        distance_matrix = get_secondary_distance_matrix(self.structure_1.secondary, self.structure_2.secondary)
+        dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open, gap_extend)
+        return dtw_aln_array_1, dtw_aln_array_2, score
 
     def get_dtw_feature_alignment(self, gap_open_feature: float = 1., gap_extend_feature: float = 1):
         distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
