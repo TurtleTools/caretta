@@ -104,14 +104,17 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
 
 
 @nb.njit
-def get_exp_distances(coords_1: np.ndarray, coords_2: np.ndarray, gamma=0.3) -> float:
+def get_exp_distances(coords_1: np.ndarray, coords_2: np.ndarray, gamma=0.3, normalize=True) -> float:
     """
     """
     score = 0
     for i in range(coords_1.shape[0]):
         score += np.exp(
             -gamma * np.sqrt(np.sum((coords_1[i] - coords_2[i]) ** 2, axis=-1)))
-    return score / coords_1.shape[0]
+    if normalize:
+        return score / coords_1.shape[0]
+    else:
+        return score
 
 
 @nb.njit
@@ -133,3 +136,42 @@ def get_rmsd_superimposed(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
     rot, tran = svd_superimpose(coords_1, coords_2)
     coords_2 = apply_rotran(coords_2, rot, tran)
     return get_rmsd(coords_1, coords_2)
+
+
+@nb.njit
+def make_signal(coords):
+    centroid = coords[coords.shape[0] // 2]
+    distances = np.zeros(coords.shape[0])
+    for i in range(coords.shape[0]):
+        distances[i] = np.sqrt(np.sum((coords[i] - centroid) ** 2, axis=-1))
+    return distances
+
+
+@nb.njit
+def make_signal_other(coords, index, length):
+    coords_sub = coords[index: index + length]
+    return make_signal(coords_sub)
+
+
+@nb.njit
+def slide(coords_1, coords_2):
+    flip = False
+    if coords_1.shape[0] > coords_2.shape[0]:
+        coords_1, coords_2 = coords_2, coords_1
+        flip = True
+    signal_1 = make_signal(coords_1)
+    length = signal_1.shape[0]
+    dots = np.zeros(coords_2.shape[0] - length)
+    for i in range(coords_2.shape[0] - length):
+        signal_2 = make_signal_other(coords_2, i, length)
+        dots[i] = np.dot(signal_1, signal_2)
+    if dots.shape[0] > 0:
+        max_index = np.argmax(dots)
+    else:
+        max_index = 0
+    rot, tran = svd_superimpose(coords_1, coords_2[max_index: max_index + length])
+    coords_2 = apply_rotran(coords_2, rot, tran)
+    if flip:
+        return coords_2, coords_1
+    else:
+        return coords_1, coords_2

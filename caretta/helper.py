@@ -2,6 +2,7 @@ import subprocess
 import typing
 from pathlib import Path
 
+import Bio.PDB
 import numba as nb
 import numpy as np
 import prody as pd
@@ -219,3 +220,49 @@ def get_sequences_from_fasta(fasta_file: typing.Union[str, Path], prune_headers:
                 current_sequence.append(line.strip())
         sequences[current_key] = ''.join(current_sequence)
     return sequences
+
+
+def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
+    """
+    returns protein information from PDB file
+    Parameters
+    ----------
+    input_file
+    name
+        None => takes from filename
+    chain
+        only for that chain
+
+    Returns
+    -------
+    structure Object, list of residue Objects, list of peptide Objects, sequence, sequence to residue index
+    """
+    if name is None:
+        (_, name, _) = get_file_parts(input_file)
+    input_file = str(input_file)
+    structure = Bio.PDB.PDBParser().get_structure(name, input_file)
+    if chain is not None:
+        structure = structure[0][chain]
+    residues = Bio.PDB.Selection.unfold_entities(structure, 'R')
+    peptides = Bio.PDB.PPBuilder().build_peptides(structure)
+    sequence = ''.join([str(peptide.get_sequence()) for peptide in peptides])
+    residue_dict = dict(zip(residues, range(len(residues))))
+    seq_to_res_index = [residue_dict[r] for peptide in peptides for r in peptide]
+    return structure, residues, peptides, sequence, seq_to_res_index
+
+
+def get_alpha_coordinates(residue) -> np.ndarray:
+    """
+    Returns alpha coordinates of BioPython residue object
+    """
+    return np.array(residue['CA'].get_coord())
+
+
+def get_beta_coordinates(residue) -> np.ndarray:
+    """
+    Returns beta coordinates of BioPython residue object
+    (alpha if Gly)
+    """
+    if residue.get_resname() == "GLY" or 'CB' not in residue:
+        return get_alpha_coordinates(residue)
+    return np.array(residue['CB'].get_coord())

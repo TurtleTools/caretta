@@ -194,8 +194,10 @@ class StructureMultiple:
                     common_coords_2 = rmsd_calculations.apply_rotran(common_coords_2, rot, tran)
                 pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
                 pairwise_coverage[i, j] = pairwise_coverage[j, i] = common_coords_1.shape[0] / len(aln_1)
-                pairwise_frac_matrix[i, j] = pairwise_frac_matrix[j, i] = get_fraction_aligned(common_coords_1, common_coords_2)
-                pairwise_tm_matrix[i, j] = pairwise_tm_matrix[j, i] = structure_pair.get_tm_score(aln_1, aln_2, False)
+                pairwise_frac_matrix[i, j] = pairwise_frac_matrix[j, i] = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2,
+                                                                                                              normalize=False)
+                pairwise_tm_matrix[i, j] = pairwise_tm_matrix[j, i] = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2,
+                                                                                                          normalize=True)
         return pairwise_rmsd_matrix, pairwise_coverage, pairwise_frac_matrix, pairwise_tm_matrix
 
     def make_pairwise_dtw_rmsd_matrix(self, alignments: dict, superimpose: bool = True, gap_open_penalty: float = 0.,

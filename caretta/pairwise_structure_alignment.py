@@ -128,9 +128,9 @@ class StructurePair:
             rmsd = 999
         return RMSD(rmsd, common_coords_1.shape[0], aln_array_1, aln_array_2, gap=gap)
 
-    def get_exp_distances(self, aln_array_1, aln_array_2):
+    def get_exp_distances(self, aln_array_1, aln_array_2, normalize=True):
         common_coords_1, common_coords_2 = self.get_common_coordinates(aln_array_1, aln_array_2)
-        return rmsd_calculations.get_exp_distances(common_coords_1[:, :3], common_coords_2[:, :3])
+        return rmsd_calculations.get_exp_distances(common_coords_1[:, :3], common_coords_2[:, :3], normalize)
 
     def get_exp_feature_distances(self, aln_array_1, aln_array_2):
         pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2, -1)
@@ -171,24 +171,51 @@ class StructurePair:
         feature_aln_1, feature_aln_2, score = self.get_dtw_feature_alignment(gap_open_feature, gap_extend_feature)
         return self.get_dtw_coord_alignment(feature_aln_1, feature_aln_2, gap_open_coord, gap_extend_coord)
 
+    def get_slide_rmsd_pos(self, gap_open_penalty, gap_extend_penalty):
+        coords_1, coords_2 = rmsd_calculations.slide(self.structure_1.coords[:, :3], self.structure_2.coords[:, :3])
+        distance_matrix = rmsd_calculations.make_distance_matrix(coords_1, coords_2,
+                                                                 tm_score=False,
+                                                                 normalize=False)
+        dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
+        pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
+        common_coords_1, common_coords_2 = coords_1[pos_1], coords_2[pos_2]
+        return rmsd_calculations.get_rmsd_superimposed(common_coords_1, common_coords_2), pos_1, pos_2
+
+    def get_secondary_rmsd_pos(self, gap_open_sec, gap_extend_sec):
+        distance_matrix = get_secondary_distance_matrix(self.structure_1.secondary, self.structure_2.secondary)
+        aln_array_1, aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_sec, gap_extend_sec)
+        pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2)
+        common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
+        return rmsd_calculations.get_rmsd_superimposed(common_coords_1, common_coords_2), pos_1, pos_2
+
     def get_dtw_coord_secondary_alignment(self, gap_open_sec=3, gap_extend_sec=1,
                                           gap_open_penalty: float = 0.,
                                           gap_extend_penalty=0.,
                                           superimpose: bool = True, plot=False):
-        distance_matrix = get_secondary_distance_matrix(self.structure_1.secondary, self.structure_2.secondary)
-        aln_array_1, aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_sec, gap_extend_sec)
-        coords_2 = self.structure_2.coords.copy()
-        if superimpose:
-            pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2)
-            common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
-            rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
-            coords_2[:, :3] = rmsd_calculations.apply_rotran(self.structure_2.coords[:, :3], rotation_matrix, translation_matrix)
-        # feature_distance_matrix = 0. * rmsd_calculations.make_distance_matrix(self.structure_1.features, self.structure_2.features, normalize=False)
-        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, coords_2, tm_score=False, normalize=False)
-        # distance_matrix += feature_distance_matrix
+
+        rmsd_1, pos_1_1, pos_2_1 = self.get_slide_rmsd_pos(gap_open_penalty, gap_extend_penalty)
+        rmsd_2, pos_1_2, pos_2_2 = self.get_secondary_rmsd_pos(gap_open_sec, gap_extend_sec)
+        print(rmsd_1, rmsd_2)
+        if rmsd_1 < rmsd_2:
+            pos_1, pos_2 = pos_1_1, pos_2_1
+        else:
+            pos_1, pos_2 = pos_1_2, pos_2_2
+        # distance_matrix = get_secondary_distance_matrix(self.structure_1.secondary, self.structure_2.secondary)
+        # aln_array_1, aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_sec, gap_extend_sec)
+        # coords_2 = self.structure_2.coords.copy()
+        # if superimpose:
+        #     pos_1, pos_2 = helper.get_common_positions(aln_array_1, aln_array_2)
+        #     common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
+        #     print("Secondary", rmsd_calculations.get_rmsd_superimposed(common_coords_1, common_coords_2))
+        #     rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
+        #     coords_2[:, :3] = rmsd_calculations.apply_rotran(self.structure_2.coords[:, :3], rotation_matrix, translation_matrix)
+        common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
+        rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
+        self.structure_2.coords[:, :3] = rmsd_calculations.apply_rotran(self.structure_2.coords[:, :3], rotation_matrix, translation_matrix)
+        distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, self.structure_2.coords, tm_score=False, normalize=False)
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         if superimpose:
-            for i in range(3):
+            for i in range(2):
                 pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
                 common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
                 rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
@@ -196,7 +223,6 @@ class StructurePair:
                                                                                 rotation_matrix, translation_matrix)
                 distance_matrix = rmsd_calculations.make_distance_matrix(self.structure_1.coords, self.structure_2.coords, tm_score=False,
                                                                          normalize=False)
-                # distance_matrix += feature_distance_matrix
                 dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         if plot:
             pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
@@ -241,7 +267,7 @@ class StructurePair:
         # distance_matrix += feature_distance_matrix
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
         if superimpose:
-            for i in range(3):
+            for i in range(2):
                 pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
                 common_coords_1, common_coords_2 = self.structure_1.coords[pos_1], self.structure_2.coords[pos_2]
                 rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
