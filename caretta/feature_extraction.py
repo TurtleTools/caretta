@@ -73,14 +73,14 @@ def get_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrit
     if force_overwrite or not dssp_file.exists():
         dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
     protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
-    data = get_dssp_features(protein)
+    data = get_dssp_features(protein, pdb_file)
     # data = {**data, **get_fluctuations(protein)}
     # data = {**data, **get_residue_depths(pdb_file)}
     # data = {**data, **get_electrostatics(protein, pdb_file, es_dir=es_dir)}
     return data
 
 
-def get_dssp_features(protein_dssp):
+def get_dssp_features_x(protein_dssp):
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
     dssp_labels = [label for label in protein_dssp.getDataLabels() if label.startswith("dssp") and label not in dssp_ignore]
     data = {}
@@ -214,7 +214,7 @@ def _get_electrostatics(protein: pd.AtomGroup, pdb_file: str, es_dir: str, es_ty
     return data
 
 
-def get_dssp_features_x(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrite=False):
+def get_dssp_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrite=False):
     """
     Gets dssp features
 
