@@ -6,11 +6,12 @@ from caretta import psa_numba as psa
 from caretta import rmsd_calculations, helper
 
 
-@nb.njit
+@nb.njit(parallel=True)
 def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
                                    gap_open_penalty: float, gap_extend_penalty: float,
                                    gap_open_sec, gap_extend_sec):
     pairwise_matrix = np.zeros((coords_array.shape[0], coords_array.shape[0]))
+    pairwise_rmsd_matrix = np.zeros((coords_array.shape[0], coords_array.shape[0]))
     for i in range(pairwise_matrix.shape[0] - 1):
         for j in range(i + 1, pairwise_matrix.shape[1]):
             dtw_aln_1, dtw_aln_2, score = psa.get_pairwise_alignment(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
@@ -22,11 +23,14 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
             common_coords_1, common_coords_2 = psa.get_common_coordinates(coords_array[i, :lengths_array[i]],
                                                                           coords_array[j, :lengths_array[j]],
                                                                           dtw_aln_1, dtw_aln_2)
+            rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
+            common_coords_2[:, :3] = rmsd_calculations.apply_rotran(common_coords_2[:, :3], rotation_matrix, translation_matrix)
             score = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2, True)
             x1, x2 = lengths_array[i], lengths_array[j]
             f1 = 2 * x1 * x2 / (x1 + x2)
             pairwise_matrix[i, j] = pairwise_matrix[j, i] = -score * f1
-    return pairwise_matrix
+            pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
+    return pairwise_matrix, pairwise_rmsd_matrix
 
 
 @nb.njit
@@ -129,18 +133,22 @@ class StructureMultiple:
         self.tree = None
         self.branch_lengths = None
 
-    def align(self, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty) -> dict:
-        self.final_structures = [s for s in self.structures]
-        pw_matrix = make_pairwise_dtw_score_matrix(self.coords_array,
-                                                   self.secondary_array,
-                                                   self.lengths_array,
-                                                   gap_open_sec=gap_open_sec,
-                                                   gap_extend_sec=gap_extend_sec,
-                                                   gap_open_penalty=gap_open_penalty,
-                                                   gap_extend_penalty=gap_extend_penalty)
+    def get_pairwise_matrices(self, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty):
+        return make_pairwise_dtw_score_matrix(self.coords_array,
+                                              self.secondary_array,
+                                              self.lengths_array,
+                                              gap_open_sec=gap_open_sec,
+                                              gap_extend_sec=gap_extend_sec,
+                                              gap_open_penalty=gap_open_penalty,
+                                              gap_extend_penalty=gap_extend_penalty)
+
+    def align(self, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
+        if pw_matrix is None:
+            pw_matrix, _ = self.get_pairwise_matrices(gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty)
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
+        self.final_structures = [s for s in self.structures]
         msa_alignments = {s.name: {s.name: s.sequence} for s in self.structures}
         maximums = 0
 
