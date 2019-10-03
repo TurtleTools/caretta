@@ -42,8 +42,8 @@ class Structure:
                 self.features = np.hstack((self.features, np.zeros((self.features.shape[0], 1))))
         else:
             self.features = features
-            if add_column:
-                self.features = np.hstack((self.features, np.zeros((self.features.shape[0], 1))))
+            # if add_column:
+            #     self.features = np.hstack((self.features, np.zeros((self.features.shape[0], 1))))
 
     def get_feature_matrix(self, dssp_features, feature_names):
         feature_names = [f for f in feature_names if f != "secondary"]
@@ -54,6 +54,12 @@ class Structure:
             feature_matrix[:, i] = ndimage.gaussian_filter1d(helper.normalize(feature_values), sigma=2)
             # feature_matrix[:, i] = helper.normalize(feature_values)
         return feature_matrix
+
+    def remove_extra_column(self):
+        return Structure(self.name, self.sequence,
+                         self.coords[:, :3],
+                         self.secondary,
+                         self.features, add_column=False)
 
 
 @nb.njit
@@ -128,7 +134,7 @@ class StructurePair:
             rmsd = 999
         return RMSD(rmsd, common_coords_1.shape[0], aln_array_1, aln_array_2, gap=gap)
 
-    def get_exp_distances(self, aln_array_1, aln_array_2, normalize=True):
+    def get_exp_distances(self, aln_array_1, aln_array_2, normalize):
         common_coords_1, common_coords_2 = self.get_common_coordinates(aln_array_1, aln_array_2)
         return rmsd_calculations.get_exp_distances(common_coords_1[:, :3], common_coords_2[:, :3], normalize)
 
@@ -195,7 +201,7 @@ class StructurePair:
 
         rmsd_1, pos_1_1, pos_2_1 = self.get_slide_rmsd_pos(gap_open_penalty, gap_extend_penalty)
         rmsd_2, pos_1_2, pos_2_2 = self.get_secondary_rmsd_pos(gap_open_sec, gap_extend_sec)
-        print(rmsd_1, rmsd_2)
+        # print(rmsd_1, rmsd_2)
         if rmsd_1 < rmsd_2:
             pos_1, pos_2 = pos_1_1, pos_2_1
         else:

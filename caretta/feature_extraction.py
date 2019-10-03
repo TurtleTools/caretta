@@ -8,6 +8,8 @@ from Bio.PDB.ResidueDepth import get_surface, residue_depth, ca_depth, min_dist
 
 from caretta import helper
 
+pd.confProDy(verbosity='none')
+
 
 def get_residue_depths(pdb_file):
     """
@@ -32,7 +34,7 @@ def get_residue_depths(pdb_file):
 def get_fluctuations(protein: pd.AtomGroup):
     data = {}
     beta_indices = helper.get_beta_indices(protein)
-    alpha_indices = helper.get_beta_indices(protein)
+    alpha_indices = helper.get_alpha_indices(protein)
     data["anm_cb"] = get_anm_fluctuations(protein[beta_indices])
     data["gnm_cb"] = get_gnm_fluctuations(protein[beta_indices])
     data["anm_ca"] = get_anm_fluctuations(protein[alpha_indices])
@@ -56,13 +58,13 @@ def get_gnm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
     return pd.calcSqFlucts(protein_gnm)
 
 
-def get_dssp_features_multiple(pdb_files, dssp_dir, num_threads=20):
+def get_features_multiple(pdb_files, dssp_dir, num_threads=1, only_dssp=True):
     num_threads = min(len(pdb_files), num_threads)
     with multiprocessing.Pool(processes=num_threads) as pool:
-        return pool.starmap(get_features, [(pdb_file, dssp_dir) for pdb_file in pdb_files])
+        return pool.starmap(get_features, [(pdb_file, dssp_dir, only_dssp) for pdb_file in pdb_files])
 
 
-def get_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrite=False):
+def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, rewrite_pdb=False, force_overwrite=False):
     pdb_file = str(pdb_file)
     _, name, _ = helper.get_file_parts(pdb_file)
     protein = pd.parsePDB(pdb_file)
@@ -72,19 +74,24 @@ def get_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrit
     dssp_file = Path(dssp_dir) / f"{name}.dssp"
     if force_overwrite or not dssp_file.exists():
         dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
-    protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
-    data = get_dssp_features(protein, pdb_file)
-    # data = {**data, **get_fluctuations(protein)}
-    # data = {**data, **get_residue_depths(pdb_file)}
-    # data = {**data, **get_electrostatics(protein, pdb_file, es_dir=es_dir)}
-    return data
+    if only_dssp:
+        protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=False)
+        data = get_dssp_features(protein)
+        return data
+    else:
+        protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
+        data = get_dssp_features(protein)
+        data = {**data, **get_fluctuations(protein)}
+        data = {**data, **get_residue_depths(pdb_file)}
+        data = {**data, **get_electrostatics(protein, pdb_file, es_dir=dssp_dir)}
+        return data
 
 
-def get_dssp_features_x(protein_dssp):
+def get_dssp_features(protein_dssp):
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
     dssp_labels = [label for label in protein_dssp.getDataLabels() if label.startswith("dssp") and label not in dssp_ignore]
     data = {}
-    alpha_indices = helper.get_beta_indices(protein_dssp)
+    alpha_indices = helper.get_alpha_indices(protein_dssp)
     indices = [protein_dssp[x].getData("dssp_resnum") for x in alpha_indices]
     for label in dssp_labels:
         label_to_index = {i - 1: protein_dssp[x].getData(label) for i, x in zip(indices, alpha_indices)}
@@ -171,34 +178,7 @@ def _get_electrostatics(protein: pd.AtomGroup, pdb_file: str, es_dir: str, es_ty
         pd.writePDB(pdb_file, protein)
     es_file, pqr_file, add = _run_electrostatics(pdb_file, es_dir, es_type, overwrite)
     pqr_protein = pd.parsePQR(str(pqr_file))
-
-    def group_indices(input_list: list) -> list:
-        """
-        [1, 1, 1, 2, 2, 3, 3, 3, 4] -> [[0, 1, 2], [3, 4], [5, 6, 7], [8]]
-        Parameters
-        ----------
-        input_list
-
-        Returns
-        -------
-        list of lists
-        """
-        output_list = []
-        current_list = []
-        current_index = None
-        for i in range(len(input_list)):
-            if current_index is None:
-                current_index = input_list[i]
-            if input_list[i] == current_index:
-                current_list.append(i)
-            else:
-                output_list.append(current_list)
-                current_list = [i]
-            current_index = input_list[i]
-        output_list.append(current_list)
-        return output_list
-
-    residue_splits = group_indices(pqr_protein.getResindices())
+    residue_splits = helper.group_indices(pqr_protein.getResindices())
     values, value_types = parse_electrostatics_file(es_file)
     data = {}
     for value_type in value_types:
@@ -214,7 +194,7 @@ def _get_electrostatics(protein: pd.AtomGroup, pdb_file: str, es_dir: str, es_ty
     return data
 
 
-def get_dssp_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrite=False):
+def get_dssp_features_x(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_overwrite=False):
     """
     Gets dssp features
 
@@ -261,11 +241,11 @@ def get_dssp_features(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_ove
     dssp_file = Path(dssp_dir) / f"{name}.dssp"
     if force_overwrite or not dssp_file.exists():
         dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
-    protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
+    protein = pd.parseDSSP(dssp=str(dssp_file), ag=protein, parseall=True)
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
     dssp_labels = [label for label in protein.getDataLabels() if label.startswith("dssp") and label not in dssp_ignore]
     data = {}
-    beta_indices = helper.get_beta_indices(protein)
+    beta_indices = helper.get_alpha_indices(protein)
     indices = [protein[x].getData("dssp_resnum") for x in beta_indices]
     for label in dssp_labels:
         label_to_index = {i - 1: protein[x].getData(label) for i, x in zip(indices, beta_indices)}

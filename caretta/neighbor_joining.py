@@ -14,7 +14,7 @@ import numpy as np
 
 
 @nb.njit
-def neighbor_joining(distance_matrix: np.ndarray, lengths: np.ndarray) -> (np.ndarray, np.ndarray):
+def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
     """
     Runs the neighbor joining algorithm on a distance matrix
     Returns guide tree as adjacency list + branch lengths
@@ -22,7 +22,6 @@ def neighbor_joining(distance_matrix: np.ndarray, lengths: np.ndarray) -> (np.nd
     Parameters
     ----------
     distance_matrix
-    lengths
 
     Returns
     -------
@@ -38,7 +37,7 @@ def neighbor_joining(distance_matrix: np.ndarray, lengths: np.ndarray) -> (np.nd
     num_intermediate_nodes = 0
     while n > 3:
         # indices of nodes to be joined (according to the current distance_matrix, not the initial one!)
-        min_ij = _find_join_nodes(distance_matrix, lengths)
+        min_ij = _find_join_nodes(distance_matrix)
         # branch lengths of each node being joined to the new node created after they are joined
         delta_ij_u = _find_branch_length(distance_matrix, min_ij[0], min_ij[1])
 
@@ -89,7 +88,7 @@ def neighbor_joining(distance_matrix: np.ndarray, lengths: np.ndarray) -> (np.nd
 
 # Q matrix calculation + minimum i, j (step 1 & 2)
 @nb.njit
-def _find_join_nodes(distance_matrix, lengths):
+def _find_join_nodes(distance_matrix):
     """
     Finds which nodes to join next
 

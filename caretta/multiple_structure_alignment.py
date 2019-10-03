@@ -234,7 +234,7 @@ class StructureMultiple:
                 # rmsd_class = structure_pair.get_rmsd_coverage(dtw_aln_1, dtw_aln_2)
                 # rot, tran = rmsd_calculations.svd_superimpose(self.structures[i].coords[:, :3], self.structures[j].coords[:, 3])
                 # self.structures[j].coords[:, :3] = rmsd_calculations.apply_rotran(self.structures[j].coords[:, 3], rot, tran)
-                score = structure_pair.get_exp_distances(dtw_aln_1, dtw_aln_2)
+                score = structure_pair.get_exp_distances(dtw_aln_1, dtw_aln_2, True)
                 x1, x2 = len(self.structures[i].sequence), len(self.structures[j].sequence)
                 f1 = 2 * x1 * x2 / (x1 + x2)
                 pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score * f1
@@ -272,7 +272,7 @@ class StructureMultiple:
                                                                                                superimpose=superimpose,
                                                                                                gap_open_penalty=gap_open_penalty,
                                                                                                gap_extend_penalty=gap_extend_penalty)
-                score = structure_pair.get_exp_distances(dtw_aln_1, dtw_aln_2)
+                score = structure_pair.get_exp_distances(dtw_aln_1, dtw_aln_2, True)
                 x1, x2 = len(self.structures[i].sequence), len(self.structures[j].sequence)
                 f1 = 2 * x1 * x2 / (x1 + x2)
                 pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = -score * f1
@@ -426,7 +426,7 @@ class StructureMultiple:
     def align_features(self, gap_open_penalty: float = 0.1, gap_extend_penalty: float = 0.001) -> dict:
         self.final_structures = [s for s in self.structures]
         pw_matrix, pw_alns = self.make_pairwise_dtw_score_matrix(gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty)
-        tree, branch_lengths = nj.neighbor_joining(pw_matrix, np.array([len(s.sequence) for s in self.structures]))
+        tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         msa_alignments = {s.name: {s.name: s.sequence} for s in self.final_structures}
         maximums = 0
 
@@ -460,7 +460,7 @@ class StructureMultiple:
     def align_secondary(self, gap_open_penalty: float = 1, gap_extend_penalty: float = 1) -> dict:
         self.final_structures = [s for s in self.structures]
         pw_matrix, pw_alns = self.make_pairwise_dtw_score_matrix_secondary(gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty)
-        tree, branch_lengths = nj.neighbor_joining(pw_matrix, np.array([len(s.sequence) for s in self.structures]))
+        tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         msa_alignments = {s.name: {s.name: s.sequence} for s in self.final_structures}
 
         def make_intermediate_node(n1, n2, n_int):
@@ -517,7 +517,7 @@ class StructureMultiple:
                                                                       superimpose=superimpose)
         # pw_matrix = helper.normalize(pw_rmsd_matrix)
         # pw_matrix *= (1 - pw_cov_matrix)
-        tree, branch_lengths = nj.neighbor_joining(pw_matrix, np.array([len(s.sequence) for s in self.structures]))
+        tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
         msa_alignments = {s.name: {s.name: s.sequence} for s in self.final_structures}
@@ -567,7 +567,7 @@ class StructureMultiple:
                                                                            gap_open_penalty=gap_open_penalty,
                                                                            gap_extend_penalty=gap_extend_penalty,
                                                                            superimpose=superimpose)
-        tree, branch_lengths = nj.neighbor_joining(pw_matrix, np.array([len(s.sequence) for s in self.structures]))
+        tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
         msa_alignments = {s.name: {s.name: s.sequence} for s in self.final_structures}

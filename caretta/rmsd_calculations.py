@@ -80,7 +80,7 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, tm_score=Fa
     matrix; shape = (n, m)
     """
     distance_matrix = np.zeros((coords_1.shape[0], coords_2.shape[0]))
-    gamma = 0.3
+    gamma = 0.15
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
             if tm_score:
@@ -104,7 +104,7 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
 
 
 @nb.njit
-def get_exp_distances(coords_1: np.ndarray, coords_2: np.ndarray, gamma=0.3, normalize=True) -> float:
+def get_exp_distances(coords_1: np.ndarray, coords_2: np.ndarray, normalize, gamma=0.15) -> float:
     """
     """
     score = 0
@@ -154,7 +154,7 @@ def make_signal_other(coords, index, length):
 
 
 @nb.njit
-def slide(coords_1, coords_2):
+def slide1(coords_1, coords_2):
     flip = False
     if coords_1.shape[0] > coords_2.shape[0]:
         coords_1, coords_2 = coords_2, coords_1
@@ -171,6 +171,124 @@ def slide(coords_1, coords_2):
         max_index = 0
     rot, tran = svd_superimpose(coords_1, coords_2[max_index: max_index + length])
     coords_2 = apply_rotran(coords_2, rot, tran)
+    if flip:
+        return coords_2, coords_1
+    else:
+        return coords_1, coords_2
+
+
+# @nb.njit
+def slide_divide(coords_1, coords_2, divide_into=5):
+    flip = False
+    if coords_1.shape[0] > coords_2.shape[0]:
+        coords_1, coords_2 = coords_2, coords_1
+        flip = True
+    length_division = coords_1.shape[0] // divide_into
+    print(length_division)
+    r_c_1 = np.zeros((0, coords_1.shape[1]))
+    r_c_2 = np.zeros((0, coords_2.shape[1]))
+    c_2_i = 0
+    for i in range(divide_into):
+        divided_coords = coords_1[i * length_division: (i + 1) * length_division]
+
+        if divided_coords.shape[0] > coords_2[c_2_i:].shape[0]:
+            break
+        print(divided_coords.shape, coords_2[c_2_i:].shape)
+        d_c_1, d_c_2, c_2_i1 = slide_divide_inner_pad(divided_coords, coords_2[c_2_i:])
+        c_2_i += c_2_i1
+        r_c_1 = np.concatenate((r_c_1, d_c_1))
+        r_c_2 = np.concatenate((r_c_2, d_c_2))
+        if c_2_i == coords_2.shape[0]:
+            break
+    rot, tran = svd_superimpose(r_c_1, r_c_2)
+    coords_2 = apply_rotran(coords_2, rot, tran)
+    coords_1 = apply_rotran(coords_1, rot, tran)
+    if flip:
+        return coords_2, coords_1
+    else:
+        return coords_1, coords_2
+
+
+# @nb.njit
+def slide_divide_inner(coords_1, coords_2):
+    signal_1 = make_signal(coords_1)
+    length = signal_1.shape[0]
+    dots = np.zeros(coords_2.shape[0] - length)
+    for i in range(coords_2.shape[0] - length):
+        signal_2 = make_signal_other(coords_2, i, length)
+        dots[i] = np.dot(signal_1, signal_2)
+    if dots.shape[0] > 0:
+        max_index = np.argmax(dots)
+    else:
+        max_index = 0
+    return coords_1, coords_2[max_index: max_index + length], max_index + length
+
+
+@nb.njit
+def slide_divide_inner_pad(coords_1, coords_2, limit=20):
+    # print("new", coords_1.shape, coords_2.shape)
+    if coords_1.shape[0] < limit:
+        limit = coords_1.shape[0]
+    signal_1 = make_signal(coords_1)
+    length = signal_1.shape[0]
+    dots = np.zeros(coords_2.shape[0] + length)
+    pad = np.zeros((length, 3))
+    padded_long = np.concatenate((pad, coords_2, pad))
+    for i in range(limit, padded_long.shape[0] - length - limit):
+        signal_2 = make_signal_other(padded_long, i, length)
+        dots[i] = np.dot(signal_1, signal_2)
+    max_index = np.argmax(dots)
+    if max_index < length:
+        coords_1_i = coords_1[-max_index:]
+        coords_2_i = coords_2[:max_index]
+        c_2_index = max_index
+    elif max_index < coords_2.shape[0]:
+        coords_2_i = coords_2[max_index - length:max_index]
+        coords_1_i = coords_1
+        c_2_index = max_index
+    elif max_index == coords_1.shape[0] == coords_2.shape[0]:
+        coords_1_i, coords_2_i = coords_1, coords_2
+        c_2_index = coords_2.shape[0]
+    else:
+        coords_1_i = coords_1[:-(max_index - coords_2.shape[0])]
+        coords_2_i = coords_2[max_index - length:]
+        c_2_index = coords_2.shape[0]
+    return coords_1_i, coords_2_i, c_2_index
+
+
+@nb.njit
+def slide(coords_1, coords_2, limit=20):
+    flip = False
+    if coords_1.shape[0] > coords_2.shape[0]:
+        coords_1, coords_2 = coords_2, coords_1
+        flip = True
+    if coords_1.shape[0] < limit:
+        limit = coords_1.shape[0]
+    signal_1 = make_signal(coords_1)
+    length = signal_1.shape[0]
+    dots = np.zeros(coords_2.shape[0] + length)
+    pad = np.zeros((length, 3))
+    padded_long = np.concatenate((pad, coords_2, pad))
+    for i in range(limit, padded_long.shape[0] - length - limit):
+        signal_2 = make_signal_other(padded_long, i, length)
+        dots[i] = np.dot(signal_1, signal_2)
+    max_index = np.argmax(dots)
+    if max_index < length:
+        coords_1_i = coords_1[-max_index:]
+        coords_2_i = coords_2[:max_index]
+        rot, tran = svd_superimpose(coords_1_i, coords_2_i)
+    elif max_index < coords_2.shape[0]:
+        coords_2_i = coords_2[max_index - length:max_index]
+        coords_1_i = coords_1
+        rot, tran = svd_superimpose(coords_1_i, coords_2_i)
+    elif max_index == coords_1.shape[0] == coords_2.shape[0]:
+        rot, tran = svd_superimpose(coords_1, coords_2)
+    else:
+        coords_1_i = coords_1[:-(max_index - coords_2.shape[0])]
+        coords_2_i = coords_2[max_index - length:]
+        rot, tran = svd_superimpose(coords_1_i, coords_2_i)
+    coords_2 = apply_rotran(coords_2, rot, tran)
+    coords_1 = apply_rotran(coords_1, rot, tran)
     if flip:
         return coords_2, coords_1
     else:

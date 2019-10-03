@@ -8,6 +8,9 @@ from caretta import feature_extraction
 from caretta import helper
 from caretta import multiple_structure_alignment as msa
 from caretta import pairwise_structure_alignment as psa
+from caretta.msa_numba import Structure
+
+pd.confProDy(verbosity='none')
 
 
 def get_pdbs(pdb_dir) -> dict:
@@ -71,6 +74,28 @@ def get_sequence_alignment(sequences: typing.Dict[str, str], directory, name="re
     return helper.get_sequences_from_fasta(aln_sequence_file)
 
 
+HSCALE = {'ALA': 1.8,
+          'ARG': -4.5,
+          'ASN': -3.5,
+          'ASP': -3.5,
+          'CYS': 2.5,
+          'GLN': -3.5,
+          'GLU': -3.5,
+          'GLY': -0.4,
+          'HIS': -3.2,
+          'ILE': 4.5,
+          'LEU': 3.8,
+          'LYS': -3.9,
+          'MET': 1.9,
+          'PHE': 2.8,
+          'PRO': -1.6,
+          'SER': -0.8,
+          'THR': -0.7,
+          'TRP': -0.9,
+          'TYR': -1.3,
+          'VAL': 4.2}
+
+
 def get_structures(pdb_dir, dssp_dir, feature_names):
     """
     Get list of Structure objects from a directory of PDB files
@@ -78,10 +103,42 @@ def get_structures(pdb_dir, dssp_dir, feature_names):
     pdbs = get_pdbs(pdb_dir)
     names = list(pdbs.keys())
     sequences = get_sequences(pdbs)
-    coordinates = [pdbs[n][helper.get_beta_indices(pdbs[n])].getCoords().astype(np.float64) for n in names]
-    features = feature_extraction.get_dssp_features_multiple([str(pdb_dir / f"{name}.ent") for name in names], str(dssp_dir))
+    coordinates = [pdbs[n][helper.get_alpha_indices(pdbs[n])].getCoords().astype(np.float64) for n in names]
+    features = feature_extraction.get_features_multiple([str(pdb_dir / f"{name}.ent") for name in names], str(dssp_dir))
     structures = [psa.Structure(names[i], sequences[names[i]], coordinates[i], psa.string_to_array(features[i]["secondary"]), features[i],
-                                make_feature_matrix=True, feature_names=feature_names) for i in range(len(names))]
+                                make_feature_matrix=False, feature_names=feature_names) for i in range(len(names))]
+    return structures
+
+
+def get_structures_nb(pdb_dir, dssp_dir):
+    """
+    Get list of Structure objects from a directory of PDB files
+    """
+    pdbs = get_pdbs(pdb_dir)
+    names = list(pdbs.keys())
+    sequences = get_sequences(pdbs)
+    coordinates = [pdbs[n][helper.get_alpha_indices(pdbs[n])].getCoords().astype(np.float64) for n in names]
+    hydros = []
+    for n in names:
+        inds = helper.get_alpha_indices(pdbs[n])
+        hydros.append(np.array([HSCALE[pdbs[n][i].getResname()] for i in inds]).reshape(-1, 1))
+    coordinates = [np.hstack((c, h)) for c, h in zip(coordinates, hydros)]
+    features = feature_extraction.get_features_multiple([str(pdb_dir / f"{name}.ent") for name in names], str(dssp_dir))
+    structures = [Structure(names[i], sequences[names[i]], psa.string_to_array(features[i]["secondary"]), coordinates[i]) for i in range(len(names))]
+    return structures
+
+
+def get_structures_names(names, pdb_dir, dssp_dir):
+    """
+    Get list of Structure objects from a directory of PDB files
+    """
+    pdbs = {name: pd.parsePDB(str(pdb_dir / f"{name}.pdb")).select("protein") for name in names}
+    names = list(pdbs.keys())
+    sequences = get_sequences(pdbs)
+    coordinates = [pdbs[n][helper.get_alpha_indices(pdbs[n])].getCoords().astype(np.float64) for n in names]
+    features = feature_extraction.get_features_multiple([str(pdb_dir / f"{name}.pdb") for name in names], str(dssp_dir))
+    structures = [psa.Structure(names[i], sequences[names[i]], coordinates[i], psa.string_to_array(features[i]["secondary"]), features[i],
+                                make_feature_matrix=False, feature_names=()) for i in range(len(names))]
     return structures
 
 

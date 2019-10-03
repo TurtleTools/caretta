@@ -7,10 +7,16 @@ import numba as nb
 import numpy as np
 import prody as pd
 
-
+pd.confProDy(verbosity='none')
 @nb.njit
 def normalize(numbers):
     minv, maxv = np.min(numbers), np.max(numbers)
+    return (numbers - minv) / (maxv - minv)
+
+
+@nb.njit
+def nan_normalize(numbers):
+    minv, maxv = np.nanmin(numbers), np.nanmax(numbers)
     return (numbers - minv) / (maxv - minv)
 
 
@@ -57,6 +63,7 @@ def get_common_positions(aln_array_1, aln_array_2, gap=-1):
     return pos_1, pos_2
 
 
+@nb.njit
 def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
     """
     Fills coordinates according to an alignment
@@ -74,18 +81,19 @@ def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
     -------
     aligned coordinates
     """
-    pos = [i for i in range(len(aln_array)) if aln_array[i] != gap]
-    assert len(pos) == data.shape[0], f"{len(pos)}, {data.shape[0]}"
+    pos = np.array([i for i in range(len(aln_array)) if aln_array[i] != gap])
+    assert len(pos) == data.shape[0]
     aln_coords = np.zeros((len(aln_array), data.shape[1]))
     aln_coords[:] = np.nan
     aln_coords[pos] = data
     return aln_coords
 
 
+@nb.njit
 def get_aligned_string_data(aln_array, data, gap=-1):
-    pos = [i for i in range(len(aln_array)) if aln_array[i] != gap]
-    assert len(pos) == data.shape[0], f"{len(pos)}, {data.shape[0]}"
-    aln_coords = np.zeros(len(aln_array), dtype=data.dtype)
+    pos = np.array([i for i in range(len(aln_array)) if aln_array[i] != gap])
+    assert len(pos) == data.shape[0]
+    aln_coords = np.zeros(aln_array.shape[0], dtype=data.dtype)
     aln_coords[pos] = data
     return aln_coords
 
@@ -113,6 +121,57 @@ def get_alpha_indices(protein):
     Get indices of alpha carbons of pd AtomGroup object
     """
     return [a.getIndex() for a in protein.iterAtoms() if a.getName() == 'CA']
+
+
+def get_beta_indices_clean(protein: pd.AtomGroup) -> list:
+    """
+    Get indices of beta carbons of pd AtomGroup object
+    """
+    residue_splits = group_indices(protein.getResindices())
+    i = 0
+    indices = []
+    for split in residue_splits:
+        ca = None
+        cb = None
+        for _ in split:
+            if protein[i].getName() == 'CB':
+                cb = protein[i].getIndex()
+            if protein[i].getName() == 'CA':
+                ca = protein[i].getIndex()
+            i += 1
+        if cb is not None:
+            indices.append(cb)
+        else:
+            assert ca is not None
+            indices.append(ca)
+    return indices
+
+
+def group_indices(input_list: list) -> list:
+    """
+    [1, 1, 1, 2, 2, 3, 3, 3, 4] -> [[0, 1, 2], [3, 4], [5, 6, 7], [8]]
+    Parameters
+    ----------
+    input_list
+
+    Returns
+    -------
+    list of lists
+    """
+    output_list = []
+    current_list = []
+    current_index = None
+    for i in range(len(input_list)):
+        if current_index is None:
+            current_index = input_list[i]
+        if input_list[i] == current_index:
+            current_list.append(i)
+        else:
+            output_list.append(current_list)
+            current_list = [i]
+        current_index = input_list[i]
+    output_list.append(current_list)
+    return output_list
 
 
 def get_beta_indices(protein: pd.AtomGroup) -> list:
