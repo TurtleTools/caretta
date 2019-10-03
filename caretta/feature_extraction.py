@@ -33,7 +33,7 @@ def get_residue_depths(pdb_file):
 
 def get_fluctuations(protein: pd.AtomGroup):
     data = {}
-    beta_indices = helper.get_beta_indices(protein)
+    beta_indices = helper.get_beta_indices_clean(protein)
     alpha_indices = helper.get_alpha_indices(protein)
     data["anm_cb"] = get_anm_fluctuations(protein[beta_indices])
     data["gnm_cb"] = get_gnm_fluctuations(protein[beta_indices])
@@ -187,7 +187,7 @@ def _get_electrostatics(protein: pd.AtomGroup, pdb_file: str, es_dir: str, es_ty
              helper.get_alpha_indices(pqr_protein)])
         data[f"{es_type}_{value_type}_cb"] = np.array(
             [values[index + add][value_type] if value_type in values[index + add] else 0 for index in
-             helper.get_beta_indices(pqr_protein)])
+             helper.get_beta_indices_clean(pqr_protein)])
         data[f"{es_type}_{value_type}_mean"] = np.array(
             [np.nanmean([values[x + add][value_type] for x in split if (x + add) in values and value_type in values[x + add]]) for split in
              residue_splits])
@@ -245,12 +245,12 @@ def get_dssp_features_x(pdb_file: str, dssp_dir: str, rewrite_pdb=False, force_o
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
     dssp_labels = [label for label in protein.getDataLabels() if label.startswith("dssp") and label not in dssp_ignore]
     data = {}
-    beta_indices = helper.get_alpha_indices(protein)
-    indices = [protein[x].getData("dssp_resnum") for x in beta_indices]
+    alpha_indices = helper.get_alpha_indices(protein)
+    indices = [protein[x].getData("dssp_resnum") for x in alpha_indices]
     for label in dssp_labels:
-        label_to_index = {i - 1: protein[x].getData(label) for i, x in zip(indices, beta_indices)}
-        data[f"{label}"] = np.array([label_to_index[i] if i in label_to_index else 0 for i in range(len(beta_indices))])
-    data["secondary"] = protein.getData("secondary")[beta_indices]
+        label_to_index = {i - 1: protein[x].getData(label) for i, x in zip(indices, alpha_indices)}
+        data[f"{label}"] = np.array([label_to_index[i] if i in label_to_index else 0 for i in range(len(alpha_indices))])
+    data["secondary"] = protein.getData("secondary")[alpha_indices]
     return data
 
 
