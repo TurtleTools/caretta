@@ -83,7 +83,7 @@ def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, rewrite_pdb=False
         data = get_dssp_features(protein)
         data = {**data, **get_fluctuations(protein)}
         data = {**data, **get_residue_depths(pdb_file)}
-        data = {**data, **get_electrostatics(protein, pdb_file, es_dir=dssp_dir)}
+        # data = {**data, **get_electrostatics(protein, pdb_file, es_dir=dssp_dir)}
         return data
 
 
