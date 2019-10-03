@@ -124,7 +124,7 @@ class StructureMultiple:
         self.structures = structures
         self.lengths_array = np.array([len(s.sequence) for s in self.structures])
         self.max_length = np.max(self.lengths_array)
-        self.coords_array = np.zeros((len(self.structures), self.max_length, 5))
+        self.coords_array = np.zeros((len(self.structures), self.max_length, 4))
         self.secondary_array = np.zeros((len(self.structures), self.max_length))
         for i in range(len(self.structures)):
             self.coords_array[i, :self.lengths_array[i]] = self.structures[i].coords
