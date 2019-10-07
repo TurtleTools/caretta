@@ -187,7 +187,7 @@ def get_slide_best_rmsd_pos(coords_1, coords_2, gap_open_penalty, gap_extend_pen
     return rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2, False), pos_1, pos_2
 
 
-# @nb.njit
+@nb.njit
 def get_slide_rmsd_pos_2(coords_1, coords_2, gap_open_penalty, gap_extend_penalty):
     coords_1_1, coords_2_1 = rmsd_calculations.slide1(coords_1[:, :3],
                                                       coords_2[:, :3])
@@ -196,11 +196,11 @@ def get_slide_rmsd_pos_2(coords_1, coords_2, gap_open_penalty, gap_extend_penalt
                                                              normalize=False)
     dtw_aln_array_1, dtw_aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
     pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
-    print("Slide Padded")
-    plt.imshow(distance_matrix)
-    plt.colorbar()
-    plt.plot(pos_2, pos_1, c="red")
-    plt.pause(0.1)
+    # print("Slide Padded")
+    # plt.imshow(distance_matrix)
+    # plt.colorbar()
+    # plt.plot(pos_2, pos_1, c="red")
+    # plt.pause(0.1)
     common_coords_1, common_coords_2 = coords_1_1[pos_1], coords_2_1[pos_2]
     rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
     common_coords_2 = rmsd_calculations.apply_rotran(common_coords_2, rot, tran)
@@ -228,9 +228,9 @@ def get_slide_rmsd_pos(coords_1, coords_2, gap_open_penalty, gap_extend_penalty)
 
 
 @nb.njit
-def get_dtw_signal_rmsd_pos(coords_1, coords_2, gap_open_penalty, gap_extend_penalty):
-    coords_1_1, coords_2_1 = rmsd_calculations.dtw_signals(coords_1[:, :3],
-                                                           coords_2[:, :3])
+def get_dtw_signal_rmsd_pos(coords_1, coords_2, index, gap_open_penalty, gap_extend_penalty):
+    coords_1_1, coords_2_1 = rmsd_calculations.dtw_signals_index(coords_1[:, :3],
+                                                                 coords_2[:, :3], index, gap_open_penalty, gap_extend_penalty)
     distance_matrix = rmsd_calculations.make_distance_matrix(coords_1_1, coords_2_1,
                                                              tm_score=False,
                                                              normalize=False)
@@ -315,33 +315,33 @@ def get_pairwise_alignment(coords_1, coords_2,
                            gap_open_sec, gap_extend_sec,
                            gap_open_penalty,
                            gap_extend_penalty):
-    rmsd_1, pos_1_1, pos_2_1 = get_dtw_signal_rmsd_pos(coords_1[:, :3], coords_2[:, :3], gap_open_penalty, gap_extend_penalty)
-    # rmsd_2, pos_1_2, pos_2_2 = get_secondary_rmsd_pos(secondary_1, secondary_2, coords_1[:, :3], coords_2[:, :3], gap_open_sec, gap_extend_sec)
-    # rmsd_2, pos_1_2, pos_2_2 = get_dtw_signal_rmsd_pos(coords_1[:, :3], coords_2[:, :3], gap_open_penalty, gap_extend_penalty)
+    rmsd_1, pos_1_1, pos_2_1 = get_dtw_signal_rmsd_pos(coords_1[:, :3], coords_2[:, :3], 0, gap_open_penalty, gap_extend_penalty)
+    rmsd_2, pos_1_2, pos_2_2 = get_secondary_rmsd_pos(secondary_1, secondary_2, coords_1[:, :3], coords_2[:, :3], gap_open_sec, gap_extend_sec)
+    rmsd_3, pos_1_3, pos_2_3 = get_dtw_signal_rmsd_pos(coords_1[:, :3], coords_2[:, :3], -1, gap_open_penalty, gap_extend_penalty)
     # rmsd_3, pos_1_3, pos_2_3 = get_split_and_compare_rmsd_pos1(coords_1[:, :3], coords_2[:, :3], gap_open_penalty, gap_extend_penalty)
     # rmsd_4, pos_1_4, pos_2_4 = get_best_match_rmsd_pos(coords_1[:, :3], coords_2[:, :3], gap_open_penalty, gap_extend_penalty)
-    # print(rmsd_1, rmsd_2, rmsd_3, rmsd_4)
+    # print(rmsd_1, rmsd_2, rmsd_3)
     # rmsds = np.array([rmsd_1, rmsd_2, rmsd_3, rmsd_4])
     # poses = np.array([(pos_1_1, pos_2_1), (pos_1_2, pos_2_2), (pos_1_3, pos_2_3), (pos_1_4, pos_2_4)])
     # index = np.argmax(rmsds)
     # pos_1, pos_2 = poses[index]
-    # if rmsd_1 > rmsd_2:
-    #     if rmsd_3 > rmsd_1:
-    #         pos_1, pos_2 = pos_1_3, pos_2_3
-    #     else:
-    #         pos_1, pos_2 = pos_1_1, pos_2_1
-    # else:
-    #     if rmsd_3 > rmsd_2:
-    #         pos_1, pos_2 = pos_1_3, pos_2_3
-    #     else:
-    #         pos_1, pos_2 = pos_1_2, pos_2_2
-    pos_1, pos_2 = pos_1_1, pos_2_1
+    if rmsd_1 > rmsd_2:
+        if rmsd_3 > rmsd_1:
+            pos_1, pos_2 = pos_1_3, pos_2_3
+        else:
+            pos_1, pos_2 = pos_1_1, pos_2_1
+    else:
+        if rmsd_3 > rmsd_2:
+            pos_1, pos_2 = pos_1_3, pos_2_3
+        else:
+            pos_1, pos_2 = pos_1_2, pos_2_2
+    # pos_1, pos_2 = pos_1_3, pos_2_3
     common_coords_1, common_coords_2 = coords_1[pos_1][:, :3], coords_2[pos_2][:, :3]
     coords_1[:, :3], coords_2[:, :3], common_coords_2 = rmsd_calculations.superpose_with_pos(coords_1[:, :3], coords_2[:, :3],
                                                                                              common_coords_1, common_coords_2)
     distance_matrix = rmsd_calculations.make_distance_matrix(coords_1, coords_2, tm_score=False, normalize=False)
     dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
-    for i in range(1):
+    for i in range(3):
         pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
         # print("final")
         # plt.imshow(distance_matrix)

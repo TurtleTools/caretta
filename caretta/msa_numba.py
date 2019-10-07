@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numba as nb
 import numpy as np
 
@@ -14,6 +15,7 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
     pairwise_rmsd_matrix = np.zeros((coords_array.shape[0], coords_array.shape[0]))
     for i in range(pairwise_matrix.shape[0] - 1):
         for j in range(i + 1, pairwise_matrix.shape[1]):
+            # print(i, j)
             dtw_aln_1, dtw_aln_2, score = psa.get_pairwise_alignment(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
                                                                      secondary_array[i, :lengths_array[i]], secondary_array[j, :lengths_array[j]],
                                                                      gap_open_sec=gap_open_sec,
@@ -25,11 +27,13 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
                                                                           dtw_aln_1, dtw_aln_2)
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
             common_coords_2[:, :3] = rmsd_calculations.apply_rotran(common_coords_2[:, :3], rotation_matrix, translation_matrix)
-            score = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2, True)
-            x1, x2 = lengths_array[i], lengths_array[j]
-            f1 = 2 * x1 * x2 / (x1 + x2)
-            pairwise_matrix[i, j] = pairwise_matrix[j, i] = -score * f1
-            pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
+            # score = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2, True)
+            # x1, x2 = lengths_array[i], lengths_array[j]
+            # f1 = 2 * x1 * x2 / (x1 + x2)
+            pairwise_matrix[i, j] = pairwise_matrix[j, i] = -score  # * f1
+            # pairwise_matrix[i, j] = -score * f1
+            pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = rmsd_calculations.get_rmsd(common_coords_1[:, :3], common_coords_2[:, :3])
+            # pairwise_rmsd_matrix[i, j] = rmsd_calculations.get_rmsd(common_coords_1[:, :3], common_coords_2[:, :3])
     return pairwise_matrix, pairwise_rmsd_matrix
 
 
@@ -102,6 +106,7 @@ def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap=0) -> n
         if aln_sec_1[i] == aln_sec_2[i]:
             mean_sec[i] = aln_sec_1[i]
         else:
+            # mean_sec[i] = gap
             if aln_sec_1[i] != gap:
                 mean_sec[i] = aln_sec_1[i]
             elif aln_sec_2[i] != gap:
@@ -146,9 +151,7 @@ class StructureMultiple:
     def align(self, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
         if pw_matrix is None:
             pw_matrix, pw_rmsd_matrix = self.get_pairwise_matrices(gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty)
-        # plt.imshow(pw_rmsd_matrix)
-        # plt.colorbar()
-        # plt.show()
+        # print("change")
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
@@ -187,18 +190,34 @@ class StructureMultiple:
             maximums = make_intermediate_node(node_1, node_2, node_int)
         node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
+        plt.imshow(pw_rmsd_matrix)
+        plt.colorbar()
+        plt.show()
+        plt.imshow(pw_matrix)
+        plt.colorbar()
+        plt.show()
         return {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}
 
     def superpose(self, alignments: dict):
+        reference_index = 0
+        reference_key = self.structures[reference_index].name
+        core_indices = np.array([i for i in range(len(alignments[reference_key])) if '-' not in [alignments[n][i] for n in alignments]])
+        # for i in range(len(self.structures)):
+        #     self.structures[i].coords[:, :3] -= rmsd_calculations._nb_mean_axis_0(self.structures[reference_index].coords[core_indices][:, :3])
+        # reference_structure = self.structures[max([(len(s.sequence), i) for i, s in enumerate(self.structures)])[1]]
+        aln_ref = helper.aligned_string_to_array(alignments[reference_key])
+        ref_coords = self.structures[reference_index].coords[np.array([aln_ref[c] for c in core_indices])][:, :3]
+        ref_centroid = rmsd_calculations._nb_mean_axis_0(ref_coords)
+        ref_coords -= ref_centroid
         for i in range(len(self.structures)):
-            self.structures[i].coords[:, :3] -= rmsd_calculations._nb_mean_axis_0(self.structures[i].coords[:, :3])
-        reference_structure = self.structures[max([(len(s.sequence), i) for i, s in enumerate(self.structures)])[1]]
-        for i in range(len(self.structures)):
-            pos_1, pos_2 = helper.get_common_positions(helper.aligned_string_to_array(alignments[reference_structure.name]),
-                                                       helper.aligned_string_to_array(alignments[self.structures[i].name]))
-            common_coords_1, common_coords_2 = reference_structure.coords[pos_1][:, :3], self.structures[i].coords[pos_2][:, :3]
-            rotation_matrix = rmsd_calculations.svd_superimpose_rot(common_coords_1, common_coords_2)
-            self.structures[i].coords[:, :3] = rmsd_calculations.apply_rot(self.structures[i].coords[:, :3], rotation_matrix)
+            if i == reference_index:
+                self.structures[i].coords[:, :3] -= ref_centroid
+            else:
+                aln_c = helper.aligned_string_to_array(alignments[self.structures[i].name])
+                common_coords_2 = self.structures[i].coords[np.array([aln_c[c] for c in core_indices])][:, :3]
+                rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(ref_coords, common_coords_2)
+                self.structures[i].coords[:, :3] = rmsd_calculations.apply_rotran(self.structures[i].coords[:, :3], rotation_matrix,
+                                                                                  translation_matrix)
 
     def make_pairwise_rmsd_matrix(self, alignments: dict, superimpose_first: bool = True):
         """

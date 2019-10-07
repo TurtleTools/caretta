@@ -123,13 +123,13 @@ def plot_difference(differences, name_theirs, their_color, name_ours="Caretta", 
                          line={"color": their_color, "width": 2}, marker={"color": their_color, "size": 10, "opacity": 0.5},
                          opacity=0.75)]
     layout = go.Layout(dict(
-        yaxis=dict(title=dict(text=y_axis_title, font={"size": 30}),
-                   tickfont={"size": 20}, showgrid=False, showline=True, mirror=True, range=[min_d, max_d]),
-        xaxis=dict(title=dict(text=x_axis_title, font={"size": 30}),
-                   tickfont={"size": 20}, showgrid=False, showline=True, mirror=True),
-        height=1000,
-        width=1500,
+        yaxis=dict(title=dict(text=y_axis_title, font={"size": 15}),
+                   tickfont={"size": 10}, showgrid=False, showline=True, mirror=True, range=[min_d, max_d]),
+        xaxis=dict(title=dict(text=x_axis_title, font={"size": 15}),
+                   tickfont={"size": 10}, showgrid=False, showline=True, mirror=True),
+        height=500,
+        width=750,
         bargap=0,
         hovermode='closest',
-        showlegend=True, legend=dict(orientation="h", y=1.1, font=dict(size=25))))
+        showlegend=True, legend=dict(orientation="h", y=1.1, font=dict(size=12))))
     return go.Figure(traces, layout)

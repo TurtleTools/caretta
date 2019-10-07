@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numba as nb
 import numpy as np
 
@@ -206,7 +207,16 @@ def get_rmsd_superimposed(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
 
 @nb.njit
 def make_signal(coords):
-    centroid = coords[coords.shape[0] // 2]
+    centroid = coords[int(np.ceil(coords.shape[0] / 2))]
+    distances = np.zeros(coords.shape[0])
+    for i in range(coords.shape[0]):
+        distances[i] = np.sqrt(np.sum((coords[i] - centroid) ** 2, axis=-1))
+    return distances
+
+
+@nb.njit
+def make_signal_index(coords, index):
+    centroid = coords[index]
     distances = np.zeros(coords.shape[0])
     for i in range(coords.shape[0]):
         distances[i] = np.sqrt(np.sum((coords[i] - centroid) ** 2, axis=-1))
@@ -219,7 +229,7 @@ def make_signal_other(coords, index, length):
     return make_signal(coords_sub)
 
 
-# @nb.njit
+@nb.njit
 def slide(coords_1, coords_2):
     flip = False
     if coords_1.shape[0] > coords_2.shape[0]:
@@ -242,7 +252,7 @@ def slide(coords_1, coords_2):
         return coords_1, coords_2
 
 
-# @nb.njit
+@nb.njit
 def slide1(coords_1, coords_2, limit=20):
     flip = False
     if coords_1.shape[0] > coords_2.shape[0]:
@@ -295,24 +305,63 @@ def slide_middle(coords_1, coords_2, size=40):
     return coords_1, coords_2
 
 
-@nb.njit
-def dtw_signals(coords_1, coords_2, size=20, overlap=1, gamma=0.15):
+# @nb.njit
+def dtw_signals(coords_1, coords_2, gap_open_penalty, gap_extend_penalty, size=50, overlap=1, gamma=0.15):
     signals_1 = np.zeros(((coords_1.shape[0] - size) // overlap, size))
     signals_2 = np.zeros(((coords_2.shape[0] - size) // overlap, size))
     middles_1 = np.zeros((signals_1.shape[0], coords_1.shape[1]))
     middles_2 = np.zeros((signals_2.shape[0], coords_2.shape[1]))
     for x, i in enumerate(range(0, signals_1.shape[0] * overlap, overlap)):
         signals_1[x] = make_signal(coords_1[i: i + size])
-        middles_1[x] = coords_1[i + size // 2]
+        middles_1[x] = coords_1[int(np.ceil((i + size) / 2))]
     for x, i in enumerate(range(0, signals_2.shape[0] * overlap, overlap)):
         signals_2[x] = make_signal(coords_2[i: i + size])
-        middles_2[x] = coords_2[i + size // 2]
+        middles_2[x] = coords_2[int(np.ceil((i + size) / 2))]
     distance_matrix = np.zeros((signals_1.shape[0], signals_2.shape[0]))
     for i in range(signals_1.shape[0]):
         for j in range(signals_2.shape[0]):
-            distance_matrix[i, j] = np.sum(np.exp(-gamma * np.sqrt((signals_1[i] - signals_2[j]) ** 2)))
+            distance_matrix[i, j] = np.median(np.exp(-gamma * np.sqrt((signals_1[i] - signals_2[j]) ** 2)))
     dtw_1, dtw_2, _ = dtw.dtw_align(distance_matrix, 0, 0)
     pos_1, pos_2 = helper.get_common_positions(dtw_1, dtw_2)
+    print("Signal inner")
+    plt.imshow(distance_matrix)
+    plt.colorbar()
+    plt.plot(pos_2, pos_1, c="red")
+    plt.pause(0.1)
+    aln_coords_1 = np.zeros((len(pos_1), coords_1.shape[1]))
+    aln_coords_2 = np.zeros((len(pos_2), coords_2.shape[1]))
+    for i, (p1, p2) in enumerate(zip(pos_1, pos_2)):
+        aln_coords_1[i] = middles_1[p1]
+        aln_coords_2[i] = middles_2[p2]
+    coords_1, coords_2, _ = superpose_with_pos(coords_1, coords_2, aln_coords_1, aln_coords_2)
+    return coords_1, coords_2
+
+
+@nb.njit
+def dtw_signals_index(coords_1, coords_2, index, gap_open_penalty, gap_extend_penalty, size=30, overlap=1, gamma=0.15):
+    signals_1 = np.zeros(((coords_1.shape[0] - size) // overlap, size))
+    signals_2 = np.zeros(((coords_2.shape[0] - size) // overlap, size))
+    middles_1 = np.zeros((signals_1.shape[0], coords_1.shape[1]))
+    middles_2 = np.zeros((signals_2.shape[0], coords_2.shape[1]))
+    if index == -1:
+        index = size - 1
+    for x, i in enumerate(range(0, signals_1.shape[0] * overlap, overlap)):
+        signals_1[x] = make_signal_index(coords_1[i: i + size], index)
+        middles_1[x] = coords_1[i + index]
+    for x, i in enumerate(range(0, signals_2.shape[0] * overlap, overlap)):
+        signals_2[x] = make_signal_index(coords_2[i: i + size], index)
+        middles_2[x] = coords_2[i + index]
+    distance_matrix = np.zeros((signals_1.shape[0], signals_2.shape[0]))
+    for i in range(signals_1.shape[0]):
+        for j in range(signals_2.shape[0]):
+            distance_matrix[i, j] = np.median(np.exp(-gamma * np.sqrt((signals_1[i] - signals_2[j]) ** 2)))
+    dtw_1, dtw_2, _ = dtw.dtw_align(distance_matrix, 0, 0)
+    pos_1, pos_2 = helper.get_common_positions(dtw_1, dtw_2)
+    # print("Signal inner")
+    # plt.imshow(distance_matrix)
+    # plt.colorbar()
+    # plt.plot(pos_2, pos_1, c="red")
+    # plt.pause(0.1)
     aln_coords_1 = np.zeros((len(pos_1), coords_1.shape[1]))
     aln_coords_2 = np.zeros((len(pos_2), coords_2.shape[1]))
     for i, (p1, p2) in enumerate(zip(pos_1, pos_2)):
