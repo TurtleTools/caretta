@@ -1,8 +1,26 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objs as go
 
 
-def plot_contour(x, y, x_axis_title="", y_axis_title="", showlabels=True):
+def plot_distance_matrix(matrix, names, width=10, height=10, vmax=None, cmap="viridis"):
+    fig = plt.figure(figsize=(width, height))
+    ax = fig.add_subplot(111)
+    ax.imshow(matrix, vmin=None, vmax=vmax, cmap=cmap)
+    ax.set_xticks(np.arange(len(names)))
+    ax.set_yticks(np.arange(len(names)))
+    ax.set_xticklabels(names, fontdict={"fontsize": 15})
+    ax.set_yticklabels(names, fontdict={"fontsize": 15})
+
+    for i in range(len(names)):
+        for j in range(len(names)):
+            text = ax.text(j, i, round(matrix[i, j], 2),
+                           ha="center", va="center", color="w", size=15)
+    fig.tight_layout()
+    plt.show()
+
+
+def plot_contour(x, y, x_axis_title="", y_axis_title="", showlabels=True, max_x=1.2, max_y=1.2):
     traces = list()
     traces.append(go.Histogram2dContour(
         x=x,
@@ -51,6 +69,7 @@ def plot_contour(x, y, x_axis_title="", y_axis_title="", showlabels=True):
             domain=[0, 0.85],
             showline=True,
             mirror=True,
+            range=[0, max_x],
             title={"text": x_axis_title, "font": {"size": 25}},
             tickfont={"size": 20}
         ),
@@ -59,6 +78,7 @@ def plot_contour(x, y, x_axis_title="", y_axis_title="", showlabels=True):
             domain=[0, 0.85],
             showline=True,
             mirror=True,
+            range=[0, max_y],
             title={"text": y_axis_title, "font": {"size": 25}},
             tickfont={"size": 20}
         ),
@@ -87,7 +107,7 @@ def plot_contour(x, y, x_axis_title="", y_axis_title="", showlabels=True):
     return go.Figure(traces, layout)
 
 
-def plot_difference(differences, name_theirs, name_ours="Caretta", x_axis_title="Alignments", y_axis_title="Difference in core columns"):
+def plot_difference(differences, name_theirs, their_color, name_ours="Caretta", x_axis_title="Alignments", y_axis_title="Difference in core columns"):
     inds = np.argsort(differences)
     zeros = sorted(list(np.where(differences[inds] == 0)[0]) * 2)
     lower = sorted(list(np.where(differences[inds] < 0)[0]) * 2)
@@ -99,17 +119,17 @@ def plot_difference(differences, name_theirs, name_ours="Caretta", x_axis_title=
                          line={"color": "green", "width": 10}, opacity=0.1),
               go.Scatter(name=f"{name_ours} underperforms", mode="lines", y=[min_d, max_d] * (len(lower) // 2), x=lower,
                          line={"color": "red", "width": 10}, opacity=0.1),
-              go.Scatter(name=f"{name_ours} - {name_theirs}", mode="lines", y=differences[inds], x=np.arange(len(differences)),
-                         line={"color": "purple", "width": 2},
+              go.Scatter(name=f"{name_ours} - {name_theirs}", mode="markers+lines", y=differences[inds], x=np.arange(len(differences)),
+                         line={"color": their_color, "width": 2}, marker={"color": their_color, "size": 10, "opacity": 0.5},
                          opacity=0.75)]
     layout = go.Layout(dict(
-        yaxis=dict(title=dict(text=y_axis_title, font={"size": 25}),
-                   tickfont={"size": 15}, showgrid=False, showline=True, mirror=True, range=[min_d, max_d]),
-        xaxis=dict(title=dict(text=x_axis_title, font={"size": 25}),
-                   tickfont={"size": 15}, showgrid=False, showline=True, mirror=True),
-        height=700,
-        width=1000,
+        yaxis=dict(title=dict(text=y_axis_title, font={"size": 30}),
+                   tickfont={"size": 20}, showgrid=False, showline=True, mirror=True, range=[min_d, max_d]),
+        xaxis=dict(title=dict(text=x_axis_title, font={"size": 30}),
+                   tickfont={"size": 20}, showgrid=False, showline=True, mirror=True),
+        height=1000,
+        width=1500,
         bargap=0,
         hovermode='closest',
-        showlegend=True, legend=dict(orientation="h", y=1.1)))
+        showlegend=True, legend=dict(orientation="h", y=1.1, font=dict(size=25))))
     return go.Figure(traces, layout)

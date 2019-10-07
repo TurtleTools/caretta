@@ -6,7 +6,7 @@ from caretta import psa_numba as psa
 from caretta import rmsd_calculations, helper
 
 
-@nb.njit(parallel=True)
+@nb.njit
 def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
                                    gap_open_penalty: float, gap_extend_penalty: float,
                                    gap_open_sec, gap_extend_sec):
@@ -44,9 +44,10 @@ def _get_alignment_data(coords_1, coords_2, secondary_1, secondary_2,
         gap_extend_sec=gap_extend_sec,
         gap_open_penalty=gap_open_penalty,
         gap_extend_penalty=gap_extend_penalty)
-    common_coords_1, common_coords_2 = psa.get_common_coordinates(coords_1, coords_2, dtw_aln_1, dtw_aln_2)
-    rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
-    coords_2 = rmsd_calculations.apply_rotran(coords_2, rot, tran)
+    pos_1, pos_2 = helper.get_common_positions(dtw_aln_1, dtw_aln_2, -1)
+    common_coords_1, common_coords_2 = coords_1[pos_1][:, :3], coords_2[pos_2][:, :3]
+    coords_1[:, :3], coords_2[:, :3], _ = rmsd_calculations.superpose_with_pos(coords_1[:, :3], coords_2[:, :3],
+                                                                               common_coords_1, common_coords_2)
     aln_coords_1 = helper.get_aligned_data(dtw_aln_1, coords_1, -1)
     aln_coords_2 = helper.get_aligned_data(dtw_aln_2, coords_2, -1)
     aln_sec_1 = helper.get_aligned_string_data(dtw_aln_1, secondary_1, -1)
@@ -144,7 +145,10 @@ class StructureMultiple:
 
     def align(self, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
         if pw_matrix is None:
-            pw_matrix, _ = self.get_pairwise_matrices(gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty)
+            pw_matrix, pw_rmsd_matrix = self.get_pairwise_matrices(gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty)
+        # plt.imshow(pw_rmsd_matrix)
+        # plt.colorbar()
+        # plt.show()
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
@@ -185,6 +189,17 @@ class StructureMultiple:
         make_intermediate_node(node_1, node_2, "final")
         return {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}
 
+    def superpose(self, alignments: dict):
+        for i in range(len(self.structures)):
+            self.structures[i].coords[:, :3] -= rmsd_calculations._nb_mean_axis_0(self.structures[i].coords[:, :3])
+        reference_structure = self.structures[max([(len(s.sequence), i) for i, s in enumerate(self.structures)])[1]]
+        for i in range(len(self.structures)):
+            pos_1, pos_2 = helper.get_common_positions(helper.aligned_string_to_array(alignments[reference_structure.name]),
+                                                       helper.aligned_string_to_array(alignments[self.structures[i].name]))
+            common_coords_1, common_coords_2 = reference_structure.coords[pos_1][:, :3], self.structures[i].coords[pos_2][:, :3]
+            rotation_matrix = rmsd_calculations.svd_superimpose_rot(common_coords_1, common_coords_2)
+            self.structures[i].coords[:, :3] = rmsd_calculations.apply_rot(self.structures[i].coords[:, :3], rotation_matrix)
+
     def make_pairwise_rmsd_matrix(self, alignments: dict, superimpose_first: bool = True):
         """
         Find RMSDs of pairwise alignment of each pair of sequences
@@ -209,29 +224,18 @@ class StructureMultiple:
         pairwise_tm_matrix = np.zeros((num, num))
         pairwise_tm_matrix[:] = np.nan
         if superimpose_first:
-            structures = [Structure(self.structures[0].name,
-                                    self.structures[0].sequence,
-                                    self.structures[0].secondary,
-                                    self.structures[0].coords[:, :3], add_column=False)]
-            for s in self.structures[1:]:
-                pos_1, pos_2 = helper.get_common_positions(helper.aligned_string_to_array(alignments[structures[0].name]),
-                                                           helper.aligned_string_to_array(alignments[s.name]))
-                common_coords_1, common_coords_2 = structures[0].coords[pos_1][:, :3], s.coords[pos_2][:, :3]
-                rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
-                coords_2 = rmsd_calculations.apply_rotran(s.coords[:, :3], rotation_matrix, translation_matrix)
-                structures.append(Structure(s.name, s.sequence, s.secondary, coords_2, add_column=False))
-        else:
-            structures = [Structure(s.name, s.sequence, s.secondary, s.coords[:, :3], add_column=False) for s in self.structures]
+            self.superpose(alignments)
         for i in range(num):
             for j in range(i + 1, num):
-                name_1, name_2 = structures[i].name, structures[j].name
+                name_1, name_2 = self.structures[i].name, self.structures[j].name
                 if isinstance(alignments[name_1], str):
                     aln_1 = helper.aligned_string_to_array(alignments[name_1])
                     aln_2 = helper.aligned_string_to_array(alignments[name_2])
                 else:
                     aln_1 = alignments[name_1]
                     aln_2 = alignments[name_2]
-                common_coords_1, common_coords_2 = psa.get_common_coordinates(structures[i].coords[:, :3], structures[j].coords[:, :3], aln_1, aln_2)
+                common_coords_1, common_coords_2 = psa.get_common_coordinates(self.structures[i].coords[:, :3],
+                                                                              self.structures[j].coords[:, :3], aln_1, aln_2)
                 assert common_coords_1.shape[0] > 0
                 if not superimpose_first:
                     rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)

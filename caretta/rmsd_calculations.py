@@ -1,6 +1,7 @@
 import numba as nb
 import numpy as np
 
+from caretta import dynamic_time_warping as dtw
 from caretta import helper
 
 
@@ -45,6 +46,35 @@ def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
 
 
 @nb.njit
+def svd_superimpose_rot(coords_1: np.ndarray, coords_2: np.ndarray):
+    """
+    Superimpose paired coordinates on each other using svd
+
+    Parameters
+    ----------
+    coords_1
+        numpy array of coordinate data for the first protein; shape = (n, 3)
+    coords_2
+        numpy array of corresponding coordinate data for the second protein; shape = (n, 3)
+
+    Returns
+    -------
+    rotation matrix, translation matrix for optimal superposition
+    """
+    # centroid_1, centroid_2 = _nb_mean_axis_0(coords_1), _nb_mean_axis_0(coords_2)
+    # coords_1_c, coords_2_c = coords_1 - centroid_1, coords_2 - centroid_2
+    correlation_matrix = np.dot(coords_2.T, coords_1)
+    u, s, v = np.linalg.svd(correlation_matrix)
+    reflect = np.linalg.det(u) * np.linalg.det(v) < 0
+    if reflect:
+        s[-1] = -s[-1]
+        u[:, -1] = -u[:, -1]
+    rotation_matrix = np.dot(u, v)
+    # translation_matrix = centroid_1 - np.dot(centroid_2, rotation_matrix)
+    return rotation_matrix.astype(np.float64)  # , translation_matrix.astype(np.float64)
+
+
+@nb.njit
 def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_matrix: np.ndarray) -> np.ndarray:
     """
     Applies a rotation and translation matrix onto coordinates
@@ -60,6 +90,42 @@ def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_ma
     transformed coordinates
     """
     return np.dot(coords, rotation_matrix) + translation_matrix
+
+
+@nb.njit
+def apply_rot(coords: np.ndarray, rotation_matrix: np.ndarray) -> np.ndarray:
+    """
+    Applies a rotation and translation matrix onto coordinates
+
+    Parameters
+    ----------
+    coords
+    rotation_matrix
+
+    Returns
+    -------
+    transformed coordinates
+    """
+    # translation_matrix = _nb_mean_axis_0(coords)
+    return np.dot(coords, rotation_matrix)  # + translation_matrix
+
+
+@nb.njit
+def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
+    rot, tran = svd_superimpose(common_coords_1, common_coords_2)
+    coords_1 = coords_1 - _nb_mean_axis_0(common_coords_1)
+    coords_2 = apply_rot(coords_2 - _nb_mean_axis_0(common_coords_2), rot)
+    common_coords_2_rot = apply_rotran(common_coords_2, rot, tran)
+    return coords_1, coords_2, common_coords_2_rot
+
+
+# @nb.njit
+def superpose_with_pos_nonb(coords_1, coords_2, common_coords_1, common_coords_2):
+    rot, tran = svd_superimpose(common_coords_1, common_coords_2)
+    coords_1 = coords_1 - _nb_mean_axis_0(common_coords_1)
+    coords_2 = apply_rot(coords_2 - _nb_mean_axis_0(common_coords_2), rot)
+    common_coords_2_rot = apply_rotran(common_coords_2, rot, tran)
+    return coords_1, coords_2, common_coords_2_rot
 
 
 @nb.njit
@@ -153,8 +219,8 @@ def make_signal_other(coords, index, length):
     return make_signal(coords_sub)
 
 
-@nb.njit
-def slide1(coords_1, coords_2):
+# @nb.njit
+def slide(coords_1, coords_2):
     flip = False
     if coords_1.shape[0] > coords_2.shape[0]:
         coords_1, coords_2 = coords_2, coords_1
@@ -164,13 +230,12 @@ def slide1(coords_1, coords_2):
     dots = np.zeros(coords_2.shape[0] - length)
     for i in range(coords_2.shape[0] - length):
         signal_2 = make_signal_other(coords_2, i, length)
-        dots[i] = np.dot(signal_1, signal_2)
+        dots[i] = np.sum(np.abs(signal_1 - signal_2))
     if dots.shape[0] > 0:
-        max_index = np.argmax(dots)
+        max_index = np.argmin(dots)
     else:
         max_index = 0
-    rot, tran = svd_superimpose(coords_1, coords_2[max_index: max_index + length])
-    coords_2 = apply_rotran(coords_2, rot, tran)
+    coords_1, coords_2, _ = superpose_with_pos(coords_1, coords_2, coords_1, coords_2[max_index: max_index + length])
     if flip:
         return coords_2, coords_1
     else:
@@ -178,118 +243,80 @@ def slide1(coords_1, coords_2):
 
 
 # @nb.njit
-def slide_divide(coords_1, coords_2, divide_into=5):
+def slide1(coords_1, coords_2, limit=20):
     flip = False
     if coords_1.shape[0] > coords_2.shape[0]:
         coords_1, coords_2 = coords_2, coords_1
         flip = True
-    length_division = coords_1.shape[0] // divide_into
-    print(length_division)
-    r_c_1 = np.zeros((0, coords_1.shape[1]))
-    r_c_2 = np.zeros((0, coords_2.shape[1]))
-    c_2_i = 0
-    for i in range(divide_into):
-        divided_coords = coords_1[i * length_division: (i + 1) * length_division]
-
-        if divided_coords.shape[0] > coords_2[c_2_i:].shape[0]:
-            break
-        print(divided_coords.shape, coords_2[c_2_i:].shape)
-        d_c_1, d_c_2, c_2_i1 = slide_divide_inner_pad(divided_coords, coords_2[c_2_i:])
-        c_2_i += c_2_i1
-        r_c_1 = np.concatenate((r_c_1, d_c_1))
-        r_c_2 = np.concatenate((r_c_2, d_c_2))
-        if c_2_i == coords_2.shape[0]:
-            break
-    rot, tran = svd_superimpose(r_c_1, r_c_2)
-    coords_2 = apply_rotran(coords_2, rot, tran)
-    coords_1 = apply_rotran(coords_1, rot, tran)
-    if flip:
-        return coords_2, coords_1
-    else:
-        return coords_1, coords_2
-
-
-# @nb.njit
-def slide_divide_inner(coords_1, coords_2):
-    signal_1 = make_signal(coords_1)
-    length = signal_1.shape[0]
-    dots = np.zeros(coords_2.shape[0] - length)
-    for i in range(coords_2.shape[0] - length):
-        signal_2 = make_signal_other(coords_2, i, length)
-        dots[i] = np.dot(signal_1, signal_2)
-    if dots.shape[0] > 0:
-        max_index = np.argmax(dots)
-    else:
-        max_index = 0
-    return coords_1, coords_2[max_index: max_index + length], max_index + length
-
-
-@nb.njit
-def slide_divide_inner_pad(coords_1, coords_2, limit=20):
-    # print("new", coords_1.shape, coords_2.shape)
     if coords_1.shape[0] < limit:
         limit = coords_1.shape[0]
     signal_1 = make_signal(coords_1)
     length = signal_1.shape[0]
-    dots = np.zeros(coords_2.shape[0] + length)
     pad = np.zeros((length, 3))
     padded_long = np.concatenate((pad, coords_2, pad))
+    dots = np.zeros(padded_long.shape[0] - length)
+    dots[:] = np.inf
     for i in range(limit, padded_long.shape[0] - length - limit):
         signal_2 = make_signal_other(padded_long, i, length)
-        dots[i] = np.dot(signal_1, signal_2)
-    max_index = np.argmax(dots)
-    if max_index < length:
-        coords_1_i = coords_1[-max_index:]
-        coords_2_i = coords_2[:max_index]
-        c_2_index = max_index
-    elif max_index < coords_2.shape[0]:
-        coords_2_i = coords_2[max_index - length:max_index]
+        dots[i] = np.sum(np.abs(signal_1 - signal_2))
+    best_index = np.argmin(dots)
+    if best_index < length:
+        coords_1_i = coords_1[-best_index:]
+        coords_2_i = coords_2[:best_index]
+    elif best_index <= coords_2.shape[0]:
+        coords_2_i = coords_2[best_index - length:best_index]
         coords_1_i = coords_1
-        c_2_index = max_index
-    elif max_index == coords_1.shape[0] == coords_2.shape[0]:
+    elif best_index == coords_1.shape[0] == coords_2.shape[0]:
         coords_1_i, coords_2_i = coords_1, coords_2
-        c_2_index = coords_2.shape[0]
     else:
-        coords_1_i = coords_1[:-(max_index - coords_2.shape[0])]
-        coords_2_i = coords_2[max_index - length:]
-        c_2_index = coords_2.shape[0]
-    return coords_1_i, coords_2_i, c_2_index
-
-
-@nb.njit
-def slide(coords_1, coords_2, limit=20):
-    flip = False
-    if coords_1.shape[0] > coords_2.shape[0]:
-        coords_1, coords_2 = coords_2, coords_1
-        flip = True
-    if coords_1.shape[0] < limit:
-        limit = coords_1.shape[0]
-    signal_1 = make_signal(coords_1)
-    length = signal_1.shape[0]
-    dots = np.zeros(coords_2.shape[0] + length)
-    pad = np.zeros((length, 3))
-    padded_long = np.concatenate((pad, coords_2, pad))
-    for i in range(limit, padded_long.shape[0] - length - limit):
-        signal_2 = make_signal_other(padded_long, i, length)
-        dots[i] = np.dot(signal_1, signal_2)
-    max_index = np.argmax(dots)
-    if max_index < length:
-        coords_1_i = coords_1[-max_index:]
-        coords_2_i = coords_2[:max_index]
-        rot, tran = svd_superimpose(coords_1_i, coords_2_i)
-    elif max_index < coords_2.shape[0]:
-        coords_2_i = coords_2[max_index - length:max_index]
-        coords_1_i = coords_1
-        rot, tran = svd_superimpose(coords_1_i, coords_2_i)
-    elif max_index == coords_1.shape[0] == coords_2.shape[0]:
-        rot, tran = svd_superimpose(coords_1, coords_2)
-    else:
-        coords_1_i = coords_1[:-(max_index - coords_2.shape[0])]
-        coords_2_i = coords_2[max_index - length:]
-        rot, tran = svd_superimpose(coords_1_i, coords_2_i)
-    coords_2 = apply_rotran(coords_2, rot, tran)
-    coords_1 = apply_rotran(coords_1, rot, tran)
+        coords_1_i = coords_1[:-(best_index - coords_2.shape[0])]
+        coords_2_i = coords_2[best_index - length:]
+    coords_1, coords_2, _ = superpose_with_pos(coords_1, coords_2, coords_1_i, coords_2_i)
     if flip:
         return coords_2, coords_1
     else:
         return coords_1, coords_2
+
+
+# @nb.njit
+def slide_middle(coords_1, coords_2, size=40):
+    sub_coords = coords_1[max(0, coords_1.shape[0] // 2 - size // 2): min(coords_1.shape[0], coords_1.shape[0] // 2 + size // 2)]
+    signal_1 = make_signal(sub_coords)
+    length = signal_1.shape[0]
+    dots = np.zeros(coords_2.shape[0] - length)
+    for i in range(coords_2.shape[0] - length):
+        signal_2 = make_signal(coords_2[i: i + length])
+        dots[i] = np.sum(np.abs(signal_1 - signal_2))
+    if dots.shape[0] > 0:
+        max_index = np.argmin(dots)
+    else:
+        max_index = 0
+    coords_1, coords_2, _ = superpose_with_pos(coords_1, coords_2, sub_coords, coords_2[max_index: max_index + length])
+    return coords_1, coords_2
+
+
+@nb.njit
+def dtw_signals(coords_1, coords_2, size=20, overlap=1, gamma=0.15):
+    signals_1 = np.zeros(((coords_1.shape[0] - size) // overlap, size))
+    signals_2 = np.zeros(((coords_2.shape[0] - size) // overlap, size))
+    middles_1 = np.zeros((signals_1.shape[0], coords_1.shape[1]))
+    middles_2 = np.zeros((signals_2.shape[0], coords_2.shape[1]))
+    for x, i in enumerate(range(0, signals_1.shape[0] * overlap, overlap)):
+        signals_1[x] = make_signal(coords_1[i: i + size])
+        middles_1[x] = coords_1[i + size // 2]
+    for x, i in enumerate(range(0, signals_2.shape[0] * overlap, overlap)):
+        signals_2[x] = make_signal(coords_2[i: i + size])
+        middles_2[x] = coords_2[i + size // 2]
+    distance_matrix = np.zeros((signals_1.shape[0], signals_2.shape[0]))
+    for i in range(signals_1.shape[0]):
+        for j in range(signals_2.shape[0]):
+            distance_matrix[i, j] = np.sum(np.exp(-gamma * np.sqrt((signals_1[i] - signals_2[j]) ** 2)))
+    dtw_1, dtw_2, _ = dtw.dtw_align(distance_matrix, 0, 0)
+    pos_1, pos_2 = helper.get_common_positions(dtw_1, dtw_2)
+    aln_coords_1 = np.zeros((len(pos_1), coords_1.shape[1]))
+    aln_coords_2 = np.zeros((len(pos_2), coords_2.shape[1]))
+    for i, (p1, p2) in enumerate(zip(pos_1, pos_2)):
+        aln_coords_1[i] = middles_1[p1]
+        aln_coords_2[i] = middles_2[p2]
+    coords_1, coords_2, _ = superpose_with_pos(coords_1, coords_2, aln_coords_1, aln_coords_2)
+    return coords_1, coords_2

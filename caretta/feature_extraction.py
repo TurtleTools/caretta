@@ -58,13 +58,13 @@ def get_gnm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
     return pd.calcSqFlucts(protein_gnm)
 
 
-def get_features_multiple(pdb_files, dssp_dir, num_threads=1, only_dssp=True):
+def get_features_multiple(pdb_files, dssp_dir, num_threads=20, only_dssp=True):
     num_threads = min(len(pdb_files), num_threads)
     with multiprocessing.Pool(processes=num_threads) as pool:
         return pool.starmap(get_features, [(pdb_file, dssp_dir, only_dssp) for pdb_file in pdb_files])
 
 
-def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, rewrite_pdb=False, force_overwrite=False):
+def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, rewrite_pdb=True, force_overwrite=True):
     pdb_file = str(pdb_file)
     _, name, _ = helper.get_file_parts(pdb_file)
     protein = pd.parsePDB(pdb_file)
@@ -73,14 +73,12 @@ def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, rewrite_pdb=False
         pd.writePDB(pdb_file, protein)
     dssp_file = Path(dssp_dir) / f"{name}.dssp"
     if force_overwrite or not dssp_file.exists():
-        dssp_file = pd.execDSSP(pdb_file, outputname=name, outputdir=str(dssp_dir))
+        dssp_file = pd.execDSSP(str(pdb_file), outputname=name, outputdir=str(dssp_dir))
+    protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
+    data = get_dssp_features(protein)
     if only_dssp:
-        protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=False)
-        data = get_dssp_features(protein)
         return data
     else:
-        protein = pd.parseDSSP(dssp=dssp_file, ag=protein, parseall=True)
-        data = get_dssp_features(protein)
         data = {**data, **get_fluctuations(protein)}
         data = {**data, **get_residue_depths(pdb_file)}
         # data = {**data, **get_electrostatics(protein, pdb_file, es_dir=dssp_dir)}
