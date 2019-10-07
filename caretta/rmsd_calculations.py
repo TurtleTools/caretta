@@ -7,7 +7,7 @@ from caretta import helper
 
 
 @nb.njit
-def _nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
+def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
     """
     Same as np.mean(array, axis=0) but njitted
     """
@@ -33,7 +33,7 @@ def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
     -------
     rotation matrix, translation matrix for optimal superposition
     """
-    centroid_1, centroid_2 = _nb_mean_axis_0(coords_1), _nb_mean_axis_0(coords_2)
+    centroid_1, centroid_2 = nb_mean_axis_0(coords_1), nb_mean_axis_0(coords_2)
     coords_1_c, coords_2_c = coords_1 - centroid_1, coords_2 - centroid_2
     correlation_matrix = np.dot(coords_2_c.T, coords_1_c)
     u, s, v = np.linalg.svd(correlation_matrix)
@@ -62,8 +62,6 @@ def svd_superimpose_rot(coords_1: np.ndarray, coords_2: np.ndarray):
     -------
     rotation matrix, translation matrix for optimal superposition
     """
-    # centroid_1, centroid_2 = _nb_mean_axis_0(coords_1), _nb_mean_axis_0(coords_2)
-    # coords_1_c, coords_2_c = coords_1 - centroid_1, coords_2 - centroid_2
     correlation_matrix = np.dot(coords_2.T, coords_1)
     u, s, v = np.linalg.svd(correlation_matrix)
     reflect = np.linalg.det(u) * np.linalg.det(v) < 0
@@ -71,8 +69,7 @@ def svd_superimpose_rot(coords_1: np.ndarray, coords_2: np.ndarray):
         s[-1] = -s[-1]
         u[:, -1] = -u[:, -1]
     rotation_matrix = np.dot(u, v)
-    # translation_matrix = centroid_1 - np.dot(centroid_2, rotation_matrix)
-    return rotation_matrix.astype(np.float64)  # , translation_matrix.astype(np.float64)
+    return rotation_matrix.astype(np.float64)
 
 
 @nb.njit
@@ -107,24 +104,14 @@ def apply_rot(coords: np.ndarray, rotation_matrix: np.ndarray) -> np.ndarray:
     -------
     transformed coordinates
     """
-    # translation_matrix = _nb_mean_axis_0(coords)
-    return np.dot(coords, rotation_matrix)  # + translation_matrix
+    return np.dot(coords, rotation_matrix)
 
 
 @nb.njit
 def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
     rot, tran = svd_superimpose(common_coords_1, common_coords_2)
-    coords_1 = coords_1 - _nb_mean_axis_0(common_coords_1)
-    coords_2 = apply_rot(coords_2 - _nb_mean_axis_0(common_coords_2), rot)
-    common_coords_2_rot = apply_rotran(common_coords_2, rot, tran)
-    return coords_1, coords_2, common_coords_2_rot
-
-
-# @nb.njit
-def superpose_with_pos_nonb(coords_1, coords_2, common_coords_1, common_coords_2):
-    rot, tran = svd_superimpose(common_coords_1, common_coords_2)
-    coords_1 = coords_1 - _nb_mean_axis_0(common_coords_1)
-    coords_2 = apply_rot(coords_2 - _nb_mean_axis_0(common_coords_2), rot)
+    coords_1 = coords_1 - nb_mean_axis_0(common_coords_1)
+    coords_2 = apply_rot(coords_2 - nb_mean_axis_0(common_coords_2), rot)
     common_coords_2_rot = apply_rotran(common_coords_2, rot, tran)
     return coords_1, coords_2, common_coords_2_rot
 
@@ -338,7 +325,7 @@ def dtw_signals(coords_1, coords_2, gap_open_penalty, gap_extend_penalty, size=5
 
 
 @nb.njit
-def dtw_signals_index(coords_1, coords_2, index, gap_open_penalty, gap_extend_penalty, size=30, overlap=1, gamma=0.15):
+def dtw_signals_index(coords_1, coords_2, index, gap_open_penalty, gap_extend_penalty, size=30, overlap=1, gamma=0.15, plot=False):
     signals_1 = np.zeros(((coords_1.shape[0] - size) // overlap, size))
     signals_2 = np.zeros(((coords_2.shape[0] - size) // overlap, size))
     middles_1 = np.zeros((signals_1.shape[0], coords_1.shape[1]))
@@ -355,13 +342,14 @@ def dtw_signals_index(coords_1, coords_2, index, gap_open_penalty, gap_extend_pe
     for i in range(signals_1.shape[0]):
         for j in range(signals_2.shape[0]):
             distance_matrix[i, j] = np.median(np.exp(-gamma * np.sqrt((signals_1[i] - signals_2[j]) ** 2)))
-    dtw_1, dtw_2, _ = dtw.dtw_align(distance_matrix, 0, 0)
+    dtw_1, dtw_2, _ = dtw.dtw_align(distance_matrix, 0., 0.)
     pos_1, pos_2 = helper.get_common_positions(dtw_1, dtw_2)
-    # print("Signal inner")
-    # plt.imshow(distance_matrix)
-    # plt.colorbar()
-    # plt.plot(pos_2, pos_1, c="red")
-    # plt.pause(0.1)
+    # if plot:
+    #     print("Signal inner")
+    #     plt.imshow(distance_matrix)
+    #     plt.colorbar()
+    #     plt.plot(pos_2, pos_1, c="red")
+    #     plt.show()
     aln_coords_1 = np.zeros((len(pos_1), coords_1.shape[1]))
     aln_coords_2 = np.zeros((len(pos_2), coords_2.shape[1]))
     for i, (p1, p2) in enumerate(zip(pos_1, pos_2)):

@@ -20,6 +20,10 @@ def nan_normalize(numbers):
     return (numbers - minv) / (maxv - minv)
 
 
+def secondary_to_array(secondary):
+    return np.array(secondary, dtype='S1').view(np.int8)
+
+
 def aligned_string_to_array(aln: str) -> np.ndarray:
     """
     Aligned sequence to array of indices with gaps as -1

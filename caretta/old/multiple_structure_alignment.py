@@ -4,7 +4,7 @@ import numba as nb
 import numpy as np
 
 from caretta import neighbor_joining as nj
-from caretta import pairwise_structure_alignment as psa
+from caretta.old import pairwise_structure_alignment as psa
 from caretta import rmsd_calculations, helper
 
 

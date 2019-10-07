@@ -10,9 +10,7 @@ import requests as rq
 from caretta import feature_extraction
 from caretta import helper, rmsd_calculations
 from caretta import msa_numba
-from caretta import multiple_structure_alignment as msa
-from caretta import pairwise_structure_alignment as psa
-from caretta import psa_numba
+from caretta.old import multiple_structure_alignment as msa, pairwise_structure_alignment as psa
 from evaluation import plotting
 
 pd.confProDy(verbosity='none')
@@ -138,7 +136,7 @@ def get_structures_nb(pdb_files, pdb_names, dssp_dir):
         #     else:
         #         secondary.append(s)
         structures.append(msa_numba.Structure(pdb_names[i], sequences[i],
-                                              psa_numba.string_to_array(features[i]["secondary"]),
+                                              helper.secondary_to_array(features[i]["secondary"]),
                                               coordinates[i]))
     return structures
 
@@ -269,7 +267,7 @@ class SABmark_matt:
                     core_distance, k5, k6 = pairwise_compare_core(query, self.msa_class, i, j)
                     rmsd[i, j] = np.mean(core_distance)
                     low_distances = np.where(distances <= 4)[0]
-                    equi[i, j] = low_distances.shape[0]
+                    equi[i, j] = np.sum(np.exp(-0.15 * core_distance))
                     core_scores[i, j] = core_distance[np.where(core_distance <= 4)].shape[0]
 
         except Exception as e:
@@ -337,7 +335,7 @@ class SABmark_mtmalign:
                     core_distance, k5, k6 = pairwise_compare_core(query, self.msa_class, i, j)
                     rmsd[i, j] = np.mean(core_distance)
                     low_distances = np.where(distances <= 4)[0]
-                    equi[i, j] = low_distances.shape[0]
+                    equi[i, j] = np.sum(np.exp(-0.15 * core_distance))
                     core_scores[i, j] = core_distance[np.where(core_distance <= 4)].shape[0]
         except Exception as e:
             pass

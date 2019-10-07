@@ -6,10 +6,6 @@ from caretta import dynamic_time_warping as dtw
 from caretta import rmsd_calculations, helper
 
 
-def string_to_array(secondary):
-    return np.array(secondary, dtype='S1').view(np.int8)
-
-
 @nb.njit
 def get_common_coordinates(coords_1, coords_2, aln_1, aln_2, gap=-1):
     assert aln_1.shape == aln_2.shape
@@ -228,22 +224,23 @@ def get_slide_rmsd_pos(coords_1, coords_2, gap_open_penalty, gap_extend_penalty)
 
 
 @nb.njit
-def get_dtw_signal_rmsd_pos(coords_1, coords_2, index, gap_open_penalty, gap_extend_penalty):
-    coords_1_1, coords_2_1 = rmsd_calculations.dtw_signals_index(coords_1[:, :3],
-                                                                 coords_2[:, :3], index, gap_open_penalty, gap_extend_penalty)
-    distance_matrix = rmsd_calculations.make_distance_matrix(coords_1_1, coords_2_1,
+def get_dtw_signal_rmsd_pos(coords_1, coords_2, index, gap_open_penalty, gap_extend_penalty, plot=False):
+    coords_1[:, :3], coords_2[:, :3] = rmsd_calculations.dtw_signals_index(coords_1[:, :3],
+                                                                           coords_2[:, :3], index, gap_open_penalty, gap_extend_penalty, plot=plot)
+    distance_matrix = rmsd_calculations.make_distance_matrix(coords_1, coords_2,
                                                              tm_score=False,
                                                              normalize=False)
     dtw_aln_array_1, dtw_aln_array_2, _ = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
     pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
-    # print("Signal")
-    # plt.imshow(distance_matrix)
-    # plt.colorbar()
-    # plt.plot(pos_2, pos_1, c="red")
-    # plt.pause(0.1)
-    common_coords_1, common_coords_2 = coords_1_1[pos_1], coords_2_1[pos_2]
-    rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
-    common_coords_2 = rmsd_calculations.apply_rotran(common_coords_2, rot, tran)
+    # if plot:
+    #     print("Signal")
+    #     plt.imshow(distance_matrix)
+    #     plt.colorbar()
+    #     plt.plot(pos_2, pos_1, c="red")
+    #     plt.show()
+    common_coords_1, common_coords_2 = coords_1[pos_1], coords_2[pos_2]
+    rot, tran = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
+    common_coords_2[:, :3] = rmsd_calculations.apply_rotran(common_coords_2[:, :3], rot, tran)
     return rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2, False), pos_1, pos_2
 
 
@@ -278,7 +275,7 @@ def slide_best(coords_1, coords_2, size=20, num_best=5):
     plt.imshow(pw_matrix)
     plt.colorbar()
     plt.plot(pos_2, pos_1, c="red")
-    plt.pause(0.1)
+    plt.show(0.1)
     aln_coords_1 = np.zeros((len(pos_1) * size, coords_1.shape[1]))
     aln_coords_2 = np.zeros((len(pos_2) * size, coords_2.shape[1]))
     for i, (p1, p2) in enumerate(zip(pos_1, pos_2)):
@@ -314,13 +311,14 @@ def get_pairwise_alignment(coords_1, coords_2,
                            secondary_1, secondary_2,
                            gap_open_sec, gap_extend_sec,
                            gap_open_penalty,
-                           gap_extend_penalty):
-    rmsd_1, pos_1_1, pos_2_1 = get_dtw_signal_rmsd_pos(coords_1[:, :3], coords_2[:, :3], 0, gap_open_penalty, gap_extend_penalty)
+                           gap_extend_penalty, plot=False):
+    rmsd_1, pos_1_1, pos_2_1 = get_dtw_signal_rmsd_pos(coords_1, coords_2, 0, gap_open_penalty, gap_extend_penalty, plot)
     rmsd_2, pos_1_2, pos_2_2 = get_secondary_rmsd_pos(secondary_1, secondary_2, coords_1[:, :3], coords_2[:, :3], gap_open_sec, gap_extend_sec)
-    rmsd_3, pos_1_3, pos_2_3 = get_dtw_signal_rmsd_pos(coords_1[:, :3], coords_2[:, :3], -1, gap_open_penalty, gap_extend_penalty)
+    rmsd_3, pos_1_3, pos_2_3 = get_dtw_signal_rmsd_pos(coords_1, coords_2, -1, gap_open_penalty, gap_extend_penalty, plot)
     # rmsd_3, pos_1_3, pos_2_3 = get_split_and_compare_rmsd_pos1(coords_1[:, :3], coords_2[:, :3], gap_open_penalty, gap_extend_penalty)
     # rmsd_4, pos_1_4, pos_2_4 = get_best_match_rmsd_pos(coords_1[:, :3], coords_2[:, :3], gap_open_penalty, gap_extend_penalty)
-    # print(rmsd_1, rmsd_2, rmsd_3)
+    # if plot:
+    #     print(rmsd_1, rmsd_2, rmsd_3)
     # rmsds = np.array([rmsd_1, rmsd_2, rmsd_3, rmsd_4])
     # poses = np.array([(pos_1_1, pos_2_1), (pos_1_2, pos_2_2), (pos_1_3, pos_2_3), (pos_1_4, pos_2_4)])
     # index = np.argmax(rmsds)
@@ -336,24 +334,41 @@ def get_pairwise_alignment(coords_1, coords_2,
         else:
             pos_1, pos_2 = pos_1_2, pos_2_2
     # pos_1, pos_2 = pos_1_3, pos_2_3
+    # if plot:
+    #     plt.plot(coords_1[:, -1])
+    #     plt.plot(coords_2[:, -1])
+    #     plt.show()
     common_coords_1, common_coords_2 = coords_1[pos_1][:, :3], coords_2[pos_2][:, :3]
-    coords_1[:, :3], coords_2[:, :3], common_coords_2 = rmsd_calculations.superpose_with_pos(coords_1[:, :3], coords_2[:, :3],
-                                                                                             common_coords_1, common_coords_2)
+    # if plot:
+    #     print(len(pos_1), len(pos_2))
+    coords_1[:, :3], coords_2[:, :3], _ = rmsd_calculations.superpose_with_pos(coords_1[:, :3], coords_2[:, :3],
+                                                                               common_coords_1, common_coords_2)
+
     distance_matrix = rmsd_calculations.make_distance_matrix(coords_1, coords_2, tm_score=False, normalize=False)
     dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
+    # if plot:
+    #     print("final")
+    #     plt.imshow(distance_matrix)
+    #     plt.colorbar()
+    #     plt.show()
     for i in range(3):
         pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
-        # print("final")
-        # plt.imshow(distance_matrix)
-        # plt.colorbar()
-        # plt.plot(pos_2, pos_1, c="red")
-        # plt.show()
+        # if plot:
+        #     print(len(pos_1), len(pos_2))
+        #     print("final")
+        #     plt.imshow(distance_matrix)
+        #     plt.colorbar()
+        #     plt.plot(pos_2, pos_1, c="red")
+        #     plt.show()
         common_coords_1, common_coords_2 = coords_1[pos_1][:, :3], coords_2[pos_2][:, :3]
-        coords_1[:, :3], coords_2[:, :3], common_coords_2 = rmsd_calculations.superpose_with_pos(coords_1[:, :3], coords_2[:, :3],
-                                                                                                 common_coords_1, common_coords_2)
+        coords_1[:, :3], coords_2[:, :3], _ = rmsd_calculations.superpose_with_pos(coords_1[:, :3], coords_2[:, :3], common_coords_1, common_coords_2)
 
         distance_matrix = rmsd_calculations.make_distance_matrix(coords_1, coords_2,
                                                                  tm_score=False,
                                                                  normalize=False)
         dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(distance_matrix, gap_open_penalty, gap_extend_penalty)
+    # if plot:
+    #     plt.plot(coords_1[:, 0], coords_1[:, 1])
+    #     plt.plot(coords_2[:, 0], coords_2[:, 1])
+    #     plt.show()
     return dtw_aln_array_1, dtw_aln_array_2, score
