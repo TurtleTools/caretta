@@ -20,8 +20,10 @@ def plot_distance_matrix(matrix, names, width=10, height=10, vmax=None, cmap="vi
     plt.show()
 
 
-def plot_contour(x, y, x_axis_title="", y_axis_title="", showlabels=True, max_x=1.2, max_y=1.2):
+def plot_contour(x, y, x_axis_title="", y_axis_title="", names=None, showlabels=True, max_x=1.2, max_y=1.2):
     traces = list()
+    if names is None:
+        names = []
     traces.append(go.Histogram2dContour(
         x=x,
         y=y,
@@ -38,6 +40,7 @@ def plot_contour(x, y, x_axis_title="", y_axis_title="", showlabels=True, max_x=
         xaxis='x',
         yaxis='y',
         mode='markers',
+        hovertext=names,
         marker=dict(
             color='rgba(0,0,0,0.3)',
             size=5,
@@ -103,33 +106,39 @@ def plot_contour(x, y, x_axis_title="", y_axis_title="", showlabels=True, max_x=
         bargap=0,
         hovermode='closest',
         showlegend=False,
+        plot_bgcolor="white"
     )
+
     return go.Figure(traces, layout)
 
 
-def plot_difference(differences, name_theirs, their_color, name_ours="Caretta", x_axis_title="Alignments", y_axis_title="Difference in core columns"):
+def plot_difference(differences, names, name_theirs, their_color, name_ours="Caretta", x_axis_title="Alignments",
+                    y_axis_title="Difference in core columns"):
     inds = np.argsort(differences)
+    names = [names[i] for i in inds]
     zeros = sorted(list(np.where(differences[inds] == 0)[0]) * 2)
     lower = sorted(list(np.where(differences[inds] < 0)[0]) * 2)
     higher = sorted(list(np.where(differences[inds] > 0)[0]) * 2)
     min_d, max_d = min(differences), max(differences)
-    traces = [go.Scatter(name=f"Similar to {name_ours}", mode="lines", y=[min_d, max_d] * (len(zeros) // 2), x=zeros,
-                         line={"color": "black", "width": 10}, opacity=0.1),
+    # print(len(list(np.where(differences[inds] == 0)[0])) + len(list(np.where(differences[inds] > 0))), len(inds))
+    traces = [go.Scatter(name=f"{name_ours} performs equally", mode="lines", y=[min_d, max_d] * (len(zeros) // 2), x=zeros,
+                         line={"color": "black", "width": 7}, opacity=0.1),
               go.Scatter(name=f"{name_ours} outperforms", mode="lines", y=[min_d, max_d] * (len(higher) // 2), x=higher,
-                         line={"color": "green", "width": 10}, opacity=0.1),
+                         line={"color": "green", "width": 7}, opacity=0.1),
               go.Scatter(name=f"{name_ours} underperforms", mode="lines", y=[min_d, max_d] * (len(lower) // 2), x=lower,
-                         line={"color": "red", "width": 10}, opacity=0.1),
+                         line={"color": "red", "width": 7}, opacity=0.1),
               go.Scatter(name=f"{name_ours} - {name_theirs}", mode="markers+lines", y=differences[inds], x=np.arange(len(differences)),
-                         line={"color": their_color, "width": 2}, marker={"color": their_color, "size": 10, "opacity": 0.5},
-                         opacity=0.75)]
+                         line={"color": their_color, "width": 2}, marker={"color": their_color, "size": 5, "opacity": 0.5},
+                         opacity=0.75, hoverinfo='text', text=names)]
     layout = go.Layout(dict(
-        yaxis=dict(title=dict(text=y_axis_title, font={"size": 15}),
-                   tickfont={"size": 10}, showgrid=False, showline=True, mirror=True, range=[min_d, max_d]),
-        xaxis=dict(title=dict(text=x_axis_title, font={"size": 15}),
-                   tickfont={"size": 10}, showgrid=False, showline=True, mirror=True),
-        height=500,
-        width=750,
+        plot_bgcolor="white",
+        yaxis=dict(title=dict(text=y_axis_title, font={"size": 20}),
+                   tickfont={"size": 15}, showgrid=False, showline=True, mirror=True, range=[min_d, max_d]),
+        xaxis=dict(title=dict(text=x_axis_title, font={"size": 20}),
+                   tickfont={"size": 15}, showgrid=False, showline=True, mirror=True),
+        height=750,
+        width=1000,
         bargap=0,
         hovermode='closest',
-        showlegend=True, legend=dict(orientation="h", y=1.1, font=dict(size=12))))
+        showlegend=True, legend=dict(orientation="h", y=1.1, font=dict(size=15))))
     return go.Figure(traces, layout)

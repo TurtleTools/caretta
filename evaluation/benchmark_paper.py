@@ -219,16 +219,16 @@ class SABmark_matt:
         self.matt_alignment = dict()
         self.sequence_alignment = dict()
 
-    def compute(self, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=0.1, gap_extend_penalty=0.01):
+    def compute(self, gamma, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=0.1, gap_extend_penalty=0.01):
         self.sequence_alignment = get_sequence_alignment({s.name: s.sequence.upper().replace('X', '') for s in self.msa_class.structures},
                                                          self.folder / "sequence_alignments", self.directory_name)
         self.matt_alignment = helper.get_sequences_from_fasta(
             self.folder / "superfamily" / self.directory_name / "matt_alignment" / f"{self.directory_name}.fasta")
         self.matt_alignment = {k.split('.')[0]: self.matt_alignment[k] for k in self.matt_alignment}
-        self.caretta_alignment = self.msa_class.align(gap_open_sec=gap_open_sec, gap_extend_sec=gap_extend_sec,
+        self.caretta_alignment = self.msa_class.align(gamma=gamma, gap_open_sec=gap_open_sec, gap_extend_sec=gap_extend_sec,
                                                       gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty)
         self.write_alignments()
-        self._get_rmsd_cov()
+        self._get_rmsd_cov(gamma)
 
     def write_alignments(self):
         for name, aln in zip(["caretta", "sequence", "matt"],
@@ -238,12 +238,12 @@ class SABmark_matt:
                 for key in aln:
                     f.write(f">{key}\n{aln[key]}\n")
 
-    def _get_rmsd_cov(self):
+    def _get_rmsd_cov(self, gamma):
         for name, aln in zip(["caretta", "sequence", "matt"],
                              [self.caretta_alignment, self.sequence_alignment,
                               self.matt_alignment]):
             try:
-                rmsd_matrix, cov_matrix, frac_matrix, _ = self.msa_class.make_pairwise_rmsd_matrix(aln)
+                rmsd_matrix, cov_matrix, frac_matrix, _ = self.msa_class.make_pairwise_rmsd_matrix(gamma, aln)
                 print(name, np.nanmean(rmsd_matrix), np.nanmean(cov_matrix), np.nanmean(frac_matrix),
                       np.nanmean(cov_matrix) * np.nanmean(frac_matrix))
             except Exception as e:
@@ -265,9 +265,9 @@ class SABmark_matt:
                 for j in range(len(query)):
                     distances, k1, k2 = pairwise_compare(query, self.msa_class, i, j)
                     core_distance, k5, k6 = pairwise_compare_core(query, self.msa_class, i, j)
-                    rmsd[i, j] = np.mean(core_distance)
+                    rmsd[i, j] = np.sum(np.exp(-0.15 * core_distance))
                     low_distances = np.where(distances <= 4)[0]
-                    equi[i, j] = np.sum(np.exp(-0.15 * core_distance))
+                    equi[i, j] = low_distances.shape[0]
                     core_scores[i, j] = core_distance[np.where(core_distance <= 4)].shape[0]
 
         except Exception as e:
@@ -291,12 +291,12 @@ class SABmark_mtmalign:
         self.mtm_alignment = dict()
         self.sequence_alignment = dict()
 
-    def compute(self, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=0.1, gap_extend_penalty=0.01):
+    def compute(self, gamma, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=0.1, gap_extend_penalty=0.01):
         self.parse_mtm_fasta()
-        self.caretta_alignment = self.msa_class.align(gap_open_sec=gap_open_sec, gap_extend_sec=gap_extend_sec,
+        self.caretta_alignment = self.msa_class.align(gamma=gamma, gap_open_sec=gap_open_sec, gap_extend_sec=gap_extend_sec,
                                                       gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty)
         self.write_alignments()
-        self._get_rmsd_cov()
+        self._get_rmsd_cov(gamma)
 
     def write_alignments(self):
         for name, aln in zip(["caretta", "mtm"],
@@ -306,12 +306,12 @@ class SABmark_mtmalign:
                 for key in aln:
                     f.write(f">{key}\n{aln[key]}\n")
 
-    def _get_rmsd_cov(self):
+    def _get_rmsd_cov(self, gamma):
         for name, aln in zip(["caretta", "mtm"],
                              [self.caretta_alignment,
                               self.mtm_alignment]):
             try:
-                rmsd_matrix, cov_matrix, frac_matrix, _ = self.msa_class.make_pairwise_rmsd_matrix(aln)
+                rmsd_matrix, cov_matrix, frac_matrix, _ = self.msa_class.make_pairwise_rmsd_matrix(gamma, aln)
                 print(name, np.nanmean(rmsd_matrix), np.nanmean(cov_matrix), np.nanmean(frac_matrix),
                       np.nanmean(cov_matrix) * np.nanmean(frac_matrix))
             except Exception as e:
@@ -333,9 +333,9 @@ class SABmark_mtmalign:
                 for j in range(len(query)):
                     distances, k1, k2 = pairwise_compare(query, self.msa_class, i, j)
                     core_distance, k5, k6 = pairwise_compare_core(query, self.msa_class, i, j)
-                    rmsd[i, j] = np.mean(core_distance)
                     low_distances = np.where(distances <= 4)[0]
-                    equi[i, j] = np.sum(np.exp(-0.15 * core_distance))
+                    equi[i, j] = low_distances.shape[0]
+                    rmsd[i, j] = np.sum(np.exp(-0.15 * core_distance))
                     core_scores[i, j] = core_distance[np.where(core_distance <= 4)].shape[0]
         except Exception as e:
             pass
@@ -373,16 +373,16 @@ class HomstradBenchmark:
         self.reference_key = None
         self.core_blocks = dict()
 
-    def compute_and_store(self, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=0.1, gap_extend_penalty=0.08):
+    def compute_and_store(self, gamma, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=0.1, gap_extend_penalty=0.08):
         self.parse_homstrad()
         self.parse_matt_fasta()
         self.parse_mTMalign_fasta()
-        msa_class = self.caretta_align(gap_open_sec=gap_open_sec, gap_extend_sec=gap_extend_sec,
+        msa_class = self.caretta_align(gamma=gamma, gap_open_sec=gap_open_sec, gap_extend_sec=gap_extend_sec,
                                        gap_extend_penalty=gap_extend_penalty, gap_open_penalty=gap_open_penalty)
         self.write_alignments()
         self.reference_key = list(self.homstrad_alignment.keys())[0]
         self.get_homstrad_cores()
-        self._get_rmsd_cov(msa_class)
+        self._get_rmsd_cov(msa_class, gamma)
         self.msa_class = msa_class
         return msa_class
 
@@ -439,7 +439,7 @@ class HomstradBenchmark:
                 self.homstrad_alignment[fasta_names[-1]] = sequences[-1]
                 _key = True
 
-    def caretta_align(self, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=0.1, gap_extend_penalty=0.08, dssp_dir="./dssp_features/"):
+    def caretta_align(self, gamma, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=0.1, gap_extend_penalty=0.08, dssp_dir="./dssp_features/"):
         pdb_entries = list(self.pdb_entries.values())
         print("Num proteins:", len(pdb_entries))
         pdb_files = [get_pdb_file(x[0], x[1], x[2], x[3], x[4], from_atm_file=self.output_folder) for x in pdb_entries]
@@ -449,7 +449,7 @@ class HomstradBenchmark:
                                                          self.output_folder, self.homstrad_id)
         self.valid = self.validate_sequence()
         msa_class = msa_numba.StructureMultiple(structures)
-        self.caretta_alignment = msa_class.align(gap_open_sec=gap_open_sec, gap_extend_sec=gap_extend_sec,
+        self.caretta_alignment = msa_class.align(gamma=gamma, gap_open_sec=gap_open_sec, gap_extend_sec=gap_extend_sec,
                                                  gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty)
         return msa_class
 
@@ -467,12 +467,12 @@ class HomstradBenchmark:
                 for key in aln:
                     f.write(f">{key}\n{aln[key]}\n")
 
-    def _get_rmsd_cov(self, aln_obj):
+    def _get_rmsd_cov(self, aln_obj, gamma):
         for name, aln in zip(["caretta", "sequence", "homstrad", "matt", "mTMalign"],
                              [self.caretta_alignment, self.sequence_alignment,
                               self.homstrad_alignment, self.matt_alignment, self.mTMA_alignment]):
             try:
-                rmsd_matrix, cov_matrix, frac_matrix, _ = aln_obj.make_pairwise_rmsd_matrix(aln)
+                rmsd_matrix, cov_matrix, frac_matrix, _ = aln_obj.make_pairwise_rmsd_matrix(gamma, aln)
                 print(name, np.nanmean(rmsd_matrix), np.nanmean(cov_matrix), np.nanmean(frac_matrix),
                       np.nanmean(cov_matrix) * np.nanmean(frac_matrix))
             except Exception as e:
