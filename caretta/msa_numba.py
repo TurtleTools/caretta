@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numba as nb
 import numpy as np
 
@@ -14,7 +13,6 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
     pairwise_matrix = np.zeros((coords_array.shape[0], coords_array.shape[0]))
     for i in range(pairwise_matrix.shape[0] - 1):
         for j in range(i + 1, pairwise_matrix.shape[1]):
-            # print(i, j)
             dtw_aln_1, dtw_aln_2, score = psa.get_pairwise_alignment(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
                                                                      secondary_array[i, :lengths_array[i]], secondary_array[j, :lengths_array[j]],
                                                                      gamma,
@@ -28,19 +26,15 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
             common_coords_2[:, :3] = rmsd_calculations.apply_rotran(common_coords_2[:, :3], rotation_matrix, translation_matrix)
             score = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2, gamma, True)
-            # x1, x2 = lengths_array[i], lengths_array[j]
-            # f1 = 2 * x1 * x2 / (x1 + x2)
             pairwise_matrix[i, j] = -score
-            # pairwise_rmsd_matrix[i, j] = rmsd_calculations.get_rmsd(common_coords_1[:, :3], common_coords_2[:, :3])
     pairwise_matrix += pairwise_matrix.T
-    # pairwise_rmsd_matrix += pairwise_rmsd_matrix.T
     return pairwise_matrix
 
 
 @nb.njit
 def _get_alignment_data(coords_1, coords_2, secondary_1, secondary_2, gamma,
                         gap_open_sec, gap_extend_sec,
-                        gap_open_penalty: float, gap_extend_penalty: float, plot=False):
+                        gap_open_penalty: float, gap_extend_penalty: float):
     dtw_aln_1, dtw_aln_2, _ = psa.get_pairwise_alignment(
         coords_1, coords_2,
         secondary_1, secondary_2,
@@ -48,7 +42,7 @@ def _get_alignment_data(coords_1, coords_2, secondary_1, secondary_2, gamma,
         gap_open_sec=gap_open_sec,
         gap_extend_sec=gap_extend_sec,
         gap_open_penalty=gap_open_penalty,
-        gap_extend_penalty=gap_extend_penalty, plot=True)
+        gap_extend_penalty=gap_extend_penalty)
     pos_1, pos_2 = helper.get_common_positions(dtw_aln_1, dtw_aln_2, -1)
     coords_1[:, :3], coords_2[:, :3], _ = rmsd_calculations.superpose_with_pos(coords_1[:, :3], coords_2[:, :3],
                                                                                coords_1[pos_1][:, :3], coords_2[pos_2][:, :3])
@@ -112,11 +106,12 @@ def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap=0) -> n
 
 class Structure:
     def __init__(self, name, sequence, secondary, coords, add_column=True):
+        consensus_weight = 1.
         self.name = name
         self.sequence = sequence
         self.secondary = secondary
         if add_column:
-            add = np.zeros((coords.shape[0], 1)) + 2.
+            add = np.zeros((coords.shape[0], 1)) + consensus_weight
             self.coords = np.hstack((coords, add))
         else:
             self.coords = coords
@@ -136,9 +131,9 @@ class StructureMultiple:
         self.tree = None
         self.branch_lengths = None
 
-    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, consensus_weight=5., pw_matrix=None,
+    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None,
               plot=True) -> dict:
-        print("Aligning ...")
+        print("Aligning...")
         if pw_matrix is None:
             pw_matrix = make_pairwise_dtw_score_matrix(self.coords_array,
                                                        self.secondary_array,
@@ -193,11 +188,6 @@ class StructureMultiple:
         node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
         alignment = {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}
-        if plot:
-            # self.superpose(alignment)
-            plt.imshow(self.make_pairwise_rmsd_matrix(gamma, alignment)[0])
-            plt.colorbar()
-            plt.show()
         return alignment
 
     def superpose(self, alignments: dict):
@@ -218,9 +208,9 @@ class StructureMultiple:
                 self.structures[i].coords[:, :3] = rmsd_calculations.apply_rotran(self.structures[i].coords[:, :3], rotation_matrix,
                                                                                   translation_matrix)
 
-    def make_pairwise_rmsd_matrix(self, gamma, alignments: dict, superpose_first: bool = True):
+    def make_pairwise_rmsd_matrix(self, alignments: dict, superpose_first: bool = True):
         """
-        Find RMSDs of pairwise alignment of each pair of sequences
+        Find RMSDs and coverages of the alignment of each pair of sequences
 
         Parameters
         ----------
@@ -237,10 +227,6 @@ class StructureMultiple:
         pairwise_rmsd_matrix[:] = np.nan
         pairwise_coverage = np.zeros((num, num))
         pairwise_coverage[:] = np.nan
-        pairwise_frac_matrix = np.zeros((num, num))
-        pairwise_frac_matrix[:] = np.nan
-        pairwise_tm_matrix = np.zeros((num, num))
-        pairwise_tm_matrix[:] = np.nan
         if superpose_first:
             self.superpose(alignments)
         for i in range(num):
@@ -260,8 +246,4 @@ class StructureMultiple:
                     common_coords_2 = rmsd_calculations.apply_rotran(common_coords_2, rot, tran)
                 pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
                 pairwise_coverage[i, j] = pairwise_coverage[j, i] = common_coords_1.shape[0] / len(aln_1)
-                pairwise_frac_matrix[i, j] = pairwise_frac_matrix[j, i] = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2,
-                                                                                                              gamma, normalize=False)
-                pairwise_tm_matrix[i, j] = pairwise_tm_matrix[j, i] = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2,
-                                                                                                          gamma, normalize=True)
-        return pairwise_rmsd_matrix, pairwise_coverage, pairwise_frac_matrix, pairwise_tm_matrix
+        return pairwise_rmsd_matrix, pairwise_coverage

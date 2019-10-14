@@ -265,7 +265,7 @@ class SABmark_matt:
                 for j in range(len(query)):
                     distances, k1, k2 = pairwise_compare(query, self.msa_class, i, j)
                     core_distance, k5, k6 = pairwise_compare_core(query, self.msa_class, i, j)
-                    rmsd[i, j] = np.sum(np.exp(-0.15 * core_distance))
+                    rmsd[i, j] = np.sum(np.exp(-0.03 * core_distance ** 2))
                     low_distances = np.where(distances <= 4)[0]
                     equi[i, j] = low_distances.shape[0]
                     core_scores[i, j] = core_distance[np.where(core_distance <= 4)].shape[0]
