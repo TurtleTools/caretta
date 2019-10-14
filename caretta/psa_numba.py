@@ -53,9 +53,7 @@ def dtw_signals_index(coords_1, coords_2, gamma, index, gap_open_penalty, gap_ex
 
 @nb.njit
 def get_dtw_signal_rmsd_pos(coords_1, coords_2, gamma, index, gap_open_penalty, gap_extend_penalty):
-    plot = True
-    coords_1[:, :3], coords_2[:, :3] = dtw_signals_index(coords_1[:, :3], coords_2[:, :3], gamma, index, gap_open_penalty, gap_extend_penalty,
-                                                         plot=plot)
+    coords_1[:, :3], coords_2[:, :3] = dtw_signals_index(coords_1[:, :3], coords_2[:, :3], gamma, index, gap_open_penalty, gap_extend_penalty)
     distance_matrix = rmsd_calculations.make_distance_matrix(coords_1[:, :3], coords_2[:, :3],
                                                              gamma,
                                                              tm_score=False,
