@@ -159,6 +159,7 @@ class StructureMultiple:
         self.final_structures = []
         self.tree = None
         self.branch_lengths = None
+        self.alignment = None
 
     def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
 
@@ -234,12 +235,15 @@ class StructureMultiple:
         node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
         alignment = {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}
+        self.alignment = alignment
         return alignment
 
-    def superpose(self, alignments: dict):
+    def superpose(self, alignments: dict = None):
         """
         Superpose structures according to alignment
         """
+        if alignments is None:
+            alignments = self.alignment
         reference_index = 0
         reference_key = self.structures[reference_index].name
         core_indices = np.array([i for i in range(len(alignments[reference_key])) if '-' not in [alignments[n][i] for n in alignments]])
@@ -257,7 +261,7 @@ class StructureMultiple:
                 self.structures[i].coords[:, :3] = rmsd_calculations.apply_rotran(self.structures[i].coords[:, :3], rotation_matrix,
                                                                                   translation_matrix)
 
-    def make_pairwise_rmsd_coverage_matrix(self, alignments: dict, superpose_first: bool = True):
+    def make_pairwise_rmsd_coverage_matrix(self, alignments: dict = None, superpose_first: bool = True):
         """
         Find RMSDs and coverages of the alignment of each pair of sequences
 
@@ -271,6 +275,8 @@ class StructureMultiple:
         -------
         RMSD matrix, coverage matrix
         """
+        if alignments is None:
+            alignments = self.alignment
         num = len(self.structures)
         pairwise_rmsd_matrix = np.zeros((num, num))
         pairwise_rmsd_matrix[:] = np.nan
@@ -297,10 +303,12 @@ class StructureMultiple:
                 pairwise_coverage[i, j] = pairwise_coverage[j, i] = common_coords_1.shape[0] / len(aln_1)
         return pairwise_rmsd_matrix, pairwise_coverage
 
-    def get_aligned_features(self, alignments: dict):
+    def get_aligned_features(self, alignments: dict = None):
         """
         Get dict of aligned features
         """
+        if alignments is None:
+            alignments = self.alignment
         feature_names = list(self.structures[0].features.keys())
         aligned_features = {}
         alignment_length = len(alignments[self.structures[0].name])
@@ -315,7 +323,14 @@ class StructureMultiple:
                 aligned_features[feature_name][p, indices] = farray
         return aligned_features
 
-    def write_superposed_pdbs(self, alignments: dict, input_pdb_folder, output_pdb_folder):
+    def write_alignment(self, filename, alignments: dict = None):
+        if alignments is None:
+            alignments = self.alignment
+        with open(filename, "w") as f:
+            for key in alignments:
+                f.write(f">{key}\n{alignments[key]}\n")
+
+    def write_superposed_pdbs(self, input_pdb_folder, output_pdb_folder, alignments: dict = None):
         """
         Superposes PDBs according to alignment and writes transformed PDBs to files
         (View with Pymol)
@@ -326,6 +341,8 @@ class StructureMultiple:
         input_pdb_folder
         output_pdb_folder
         """
+        if alignments is None:
+            alignments = self.alignment
         output_pdb_folder = Path(output_pdb_folder)
         input_pdb_folder = Path(input_pdb_folder)
         if not output_pdb_folder.exists():
