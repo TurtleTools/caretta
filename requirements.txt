@@ -1,5 +1,5 @@
 prody
 numpy
 numba
-scipy
 biopython
+fire

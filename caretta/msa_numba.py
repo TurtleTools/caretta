@@ -115,7 +115,7 @@ def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap=0) -> n
 
 
 class Structure:
-    def __init__(self, name, sequence, secondary, features, coords, add_column=True):
+    def __init__(self, name, pdb_file, sequence, secondary, features, coords, add_column=True):
         """
         Makes a Structure object
 
@@ -133,6 +133,7 @@ class Structure:
         """
         consensus_weight = 1.
         self.name = name
+        self.pdb_file = pdb_file
         self.sequence = sequence
         self.secondary = secondary
         self.features = features
@@ -174,8 +175,9 @@ class StructureMultiple:
                                                                  gap_extend_sec=gap_extend_sec,
                                                                  gap_open_penalty=gap_open_penalty,
                                                                  gap_extend_penalty=gap_extend_penalty)
-            return {self.structures[0].name: "".join([self.structures[0].sequence[i] if i != -1 else '-' for i in dtw_aln_1]),
-                    self.structures[1].name: "".join([self.structures[1].sequence[i] if i != -1 else '-' for i in dtw_aln_2])}
+            self.alignment = {self.structures[0].name: "".join([self.structures[0].sequence[i] if i != -1 else '-' for i in dtw_aln_1]),
+                              self.structures[1].name: "".join([self.structures[1].sequence[i] if i != -1 else '-' for i in dtw_aln_2])}
+            return self.alignment
 
         if pw_matrix is None:
             pw_matrix = make_pairwise_dtw_score_matrix(self.coords_array,
@@ -225,7 +227,7 @@ class StructureMultiple:
 
             mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2)
             mean_sec = get_mean_secondary(aln_sec_1, aln_sec_2, 0)
-            self.final_structures.append(Structure(name_int, None, mean_sec, None, mean_coords, add_column=False))
+            self.final_structures.append(Structure(name_int, None, None, mean_sec, None, mean_coords, add_column=False))
 
         for x in range(0, self.tree.shape[0] - 1, 2):
             node_1, node_2, node_int = self.tree[x, 0], self.tree[x + 1, 0], self.tree[x, 1]
@@ -324,13 +326,16 @@ class StructureMultiple:
         return aligned_features
 
     def write_alignment(self, filename, alignments: dict = None):
+        """
+        Writes alignment to a fasta file
+        """
         if alignments is None:
             alignments = self.alignment
         with open(filename, "w") as f:
             for key in alignments:
                 f.write(f">{key}\n{alignments[key]}\n")
 
-    def write_superposed_pdbs(self, input_pdb_folder, output_pdb_folder, alignments: dict = None):
+    def write_superposed_pdbs(self, output_pdb_folder, alignments: dict = None):
         """
         Superposes PDBs according to alignment and writes transformed PDBs to files
         (View with Pymol)
@@ -338,29 +343,26 @@ class StructureMultiple:
         Parameters
         ----------
         alignments
-        input_pdb_folder
         output_pdb_folder
         """
         if alignments is None:
             alignments = self.alignment
         output_pdb_folder = Path(output_pdb_folder)
-        input_pdb_folder = Path(input_pdb_folder)
         if not output_pdb_folder.exists():
             output_pdb_folder.mkdir()
         reference_name = self.structures[0].name
-        reference_pdb = pd.parsePDB(input_pdb_folder / f"{reference_name}.pdb")
+        reference_pdb = pd.parsePDB(self.structures[0].pdb_file)
         core_indices = np.array([i for i in range(len(alignments[reference_name])) if '-' not in [alignments[n][i] for n in alignments]])
         aln_ref = helper.aligned_string_to_array(alignments[reference_name])
         ref_coords_core = reference_pdb[helper.get_alpha_indices(reference_pdb)].getCoords().astype(np.float64)[
             np.array([aln_ref[c] for c in core_indices])]
         ref_centroid = rmsd_calculations.nb_mean_axis_0(ref_coords_core)
         transformation = pd.Transformation(np.eye(3), -ref_centroid)
-        reference_pdb = pd.parsePDB(input_pdb_folder / f"{reference_name}.pdb")
         reference_pdb = pd.applyTransformation(transformation, reference_pdb)
         pd.writePDB(str(output_pdb_folder / f"{reference_name}.pdb"), reference_pdb)
         for i in range(1, len(self.structures)):
             name = self.structures[i].name
-            pdb = pd.parsePDB(input_pdb_folder / f"{name}.pdb")
+            pdb = pd.parsePDB(self.structures[i].pdb_file)
             aln_name = helper.aligned_string_to_array(alignments[name])
             common_coords_2 = pdb[helper.get_alpha_indices(pdb)].getCoords().astype(np.float64)[np.array([aln_name[c] for c in core_indices])]
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(ref_coords_core, common_coords_2)
