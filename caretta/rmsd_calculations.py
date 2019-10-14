@@ -1,11 +1,11 @@
-import matplotlib.pyplot as plt
 import numba as nb
 import numpy as np
 
-from caretta import dynamic_time_warping as dtw
-from caretta import helper
 
-GAMMA = 0.1
+@nb.njit
+def normalize(numbers):
+    minv, maxv = np.min(numbers), np.max(numbers)
+    return (numbers - minv) / (maxv - minv)
 
 
 @nb.njit
@@ -49,32 +49,6 @@ def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
 
 
 @nb.njit
-def svd_superimpose_rot(coords_1: np.ndarray, coords_2: np.ndarray):
-    """
-    Superimpose paired coordinates on each other using svd
-
-    Parameters
-    ----------
-    coords_1
-        numpy array of coordinate data for the first protein; shape = (n, 3)
-    coords_2
-        numpy array of corresponding coordinate data for the second protein; shape = (n, 3)
-
-    Returns
-    -------
-    rotation matrix, translation matrix for optimal superposition
-    """
-    correlation_matrix = np.dot(coords_2.T, coords_1)
-    u, s, v = np.linalg.svd(correlation_matrix)
-    reflect = np.linalg.det(u) * np.linalg.det(v) < 0
-    if reflect:
-        s[-1] = -s[-1]
-        u[:, -1] = -u[:, -1]
-    rotation_matrix = np.dot(u, v)
-    return rotation_matrix.astype(np.float64)
-
-
-@nb.njit
 def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_matrix: np.ndarray) -> np.ndarray:
     """
     Applies a rotation and translation matrix onto coordinates
@@ -93,33 +67,30 @@ def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_ma
 
 
 @nb.njit
-def apply_rot(coords: np.ndarray, rotation_matrix: np.ndarray) -> np.ndarray:
+def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
     """
-    Applies a rotation and translation matrix onto coordinates
+    Superpose two sets of un-aligned coordinates using smaller subsets of aligned coordinates
 
     Parameters
     ----------
-    coords
-    rotation_matrix
+    coords_1
+    coords_2
+    common_coords_1
+    common_coords_2
 
     Returns
     -------
-    transformed coordinates
+    superposed coord_1, superposed coords_2, superposed common_coords_2
     """
-    return np.dot(coords, rotation_matrix)
-
-
-@nb.njit
-def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
     rot, tran = svd_superimpose(common_coords_1, common_coords_2)
     coords_1 = coords_1 - nb_mean_axis_0(common_coords_1)
-    coords_2 = apply_rot(coords_2 - nb_mean_axis_0(common_coords_2), rot)
+    coords_2 = np.dot(coords_2 - nb_mean_axis_0(common_coords_2), rot)
     common_coords_2_rot = apply_rotran(common_coords_2, rot, tran)
     return coords_1, coords_2, common_coords_2_rot
 
 
 @nb.njit
-def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, tm_score=False, normalize=False) -> np.ndarray:
+def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized=False) -> np.ndarray:
     """
     Makes matrix of euclidean distances of each coordinate in coords_1 to each coordinate in coords_2
     TODO: probably faster to do upper triangle += transpose
@@ -129,8 +100,8 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, tm_s
         shape = (n, 3)
     coords_2
         shape = (m, 3)
-    tm_score
-    normalize
+    gamma
+    normalized
     Returns
     -------
     matrix; shape = (n, m)
@@ -138,14 +109,9 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, tm_s
     distance_matrix = np.zeros((coords_1.shape[0], coords_2.shape[0]))
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
-            if tm_score:
-                d0 = 1.24 * (min(coords_1.shape[0], coords_2.shape[0]) - 15) ** (1 / 3) - 1.8
-                distance_matrix[i, j] = 1 / (1 + np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1) / d0 ** 2)
-            else:
-                distance_matrix[i, j] = np.exp(
-                    -gamma * np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1))
-    if normalize:
-        return helper.normalize(distance_matrix)
+            distance_matrix[i, j] = np.exp(-gamma * np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1))
+    if normalized:
+        return normalize(distance_matrix)
     else:
         return distance_matrix
 
@@ -159,38 +125,29 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
 
 
 @nb.njit
-def get_exp_distances(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalize) -> float:
+def get_caretta_score(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized) -> float:
     """
+    Get caretta score for a a set of paired coordinates
+
+    Parameters
+    ----------
+    coords_1
+    coords_2
+    gamma
+    normalized
+
+    Returns
+    -------
+    Caretta score
     """
     score = 0
     for i in range(coords_1.shape[0]):
         score += np.exp(
             -gamma * np.sum((coords_1[i] - coords_2[i]) ** 2, axis=-1))
-    if normalize:
+    if normalized:
         return score / coords_1.shape[0]
     else:
         return score
-
-
-@nb.njit
-def get_rmsd_superimposed(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
-    """
-    RMSD of paired coordinates after SVD superimposing
-
-    Parameters
-    ----------
-    coords_1
-        numpy array of coordinate data for the first protein; shape = (n, 3)
-    coords_2
-        numpy array of corresponding coordinate data for the second protein; shape = (n, 3)
-
-    Returns
-    -------
-    rmsd
-    """
-    rot, tran = svd_superimpose(coords_1, coords_2)
-    coords_2 = apply_rotran(coords_2, rot, tran)
-    return get_rmsd(coords_1, coords_2)
 
 
 

@@ -33,28 +33,28 @@ def _make_dtw_matrix(distance_matrix: np.ndarray,
     matrix[0, 0] = 0
     backtrack = np.zeros((n + 1, m + 1, 3), dtype=np.int64)
     for i in range(1, n + 1):
-        matrix[i, 0, 0] = 0  # gap_extend_penalty  # gap_open_penalty  # + ((i - 1) * gap_extend_penalty)
-        matrix[i, 0, 1] = 0  # gap_extend_penalty  # gap_open_penalty  # + ((i - 1) * gap_extend_penalty)
+        matrix[i, 0, 0] = 0
+        matrix[i, 0, 1] = 0
         matrix[i, 0, 2] = MINV - gap_open_penalty
         backtrack[i, 0] = 0
 
     for j in range(1, m + 1):
-        matrix[0, j, 0] = MINV - gap_open_penalty  # gap_extend_penalty
-        matrix[0, j, 1] = 0  # gap_extend_penalty  # gap_open_penalty  # + ((j - 1) * gap_extend_penalty)
-        matrix[0, j, 2] = 0  # gap_extend_penalty  # gap_open_penalty  # + ((j - 1) * gap_extend_penalty)
+        matrix[0, j, 0] = MINV - gap_open_penalty
+        matrix[0, j, 1] = 0
+        matrix[0, j, 2] = 0
         backtrack[0, j] = 1
 
     for i in range(1, n + 1):
         for j in range(1, m + 1):
             scores_lower = np.array([matrix[i - 1, j, 0] + gap_extend_penalty,
-                                     matrix[i - 1, j, 1] + gap_open_penalty])  # + distance_matrix[i - 1, j - 1]
+                                     matrix[i - 1, j, 1] + gap_open_penalty])
             min_index_lower = np.argmax(scores_lower)
             min_value_lower = scores_lower[min_index_lower]
             matrix[i, j, 0] = min_value_lower
             backtrack[i, j, 0] = min_index_lower
 
             scores_upper = np.array([matrix[i, j - 1, 1] + gap_open_penalty,
-                                     matrix[i, j - 1, 2] + gap_extend_penalty])  # + distance_matrix[i - 1, j - 1]
+                                     matrix[i, j - 1, 2] + gap_extend_penalty])
             min_index_upper = np.argmax(scores_upper)
             min_value_upper = scores_upper[min_index_upper]
             matrix[i, j, 2] = min_value_upper

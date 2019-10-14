@@ -6,6 +6,13 @@ from caretta import psa_numba as psa
 from caretta import rmsd_calculations, helper
 
 
+@nb.njit
+def get_common_coordinates(coords_1, coords_2, aln_1, aln_2, gap=-1):
+    assert aln_1.shape == aln_2.shape
+    pos_1, pos_2 = helper.get_common_positions(aln_1, aln_2, gap)
+    return coords_1[pos_1], coords_2[pos_2]
+
+
 @nb.njit(parallel=True)
 def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array, gamma,
                                    gap_open_penalty: float, gap_extend_penalty: float,
@@ -20,12 +27,12 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
                                                                      gap_extend_sec=gap_extend_sec,
                                                                      gap_open_penalty=gap_open_penalty,
                                                                      gap_extend_penalty=gap_extend_penalty)
-            common_coords_1, common_coords_2 = psa.get_common_coordinates(coords_array[i, :lengths_array[i]],
-                                                                          coords_array[j, :lengths_array[j]],
-                                                                          dtw_aln_1, dtw_aln_2)
+            common_coords_1, common_coords_2 = get_common_coordinates(coords_array[i, :lengths_array[i]],
+                                                                      coords_array[j, :lengths_array[j]],
+                                                                      dtw_aln_1, dtw_aln_2)
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
             common_coords_2[:, :3] = rmsd_calculations.apply_rotran(common_coords_2[:, :3], rotation_matrix, translation_matrix)
-            score = rmsd_calculations.get_exp_distances(common_coords_1, common_coords_2, gamma, True)
+            score = rmsd_calculations.get_caretta_score(common_coords_1, common_coords_2, gamma, True)
             pairwise_matrix[i, j] = -score
     pairwise_matrix += pairwise_matrix.T
     return pairwise_matrix
@@ -105,11 +112,27 @@ def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap=0) -> n
 
 
 class Structure:
-    def __init__(self, name, sequence, secondary, coords, add_column=True):
+    def __init__(self, name, sequence, secondary, features, coords, add_column=True):
+        """
+        Makes a Structure object
+
+        Parameters
+        ----------
+        name
+        sequence
+        secondary
+        features
+            dict of features
+        coords
+            array of alpha carbon coordinates
+        add_column
+            adds a column for consensus weight if True
+        """
         consensus_weight = 1.
         self.name = name
         self.sequence = sequence
         self.secondary = secondary
+        self.features = features
         if add_column:
             add = np.zeros((coords.shape[0], 1)) + consensus_weight
             self.coords = np.hstack((coords, add))
@@ -131,9 +154,22 @@ class StructureMultiple:
         self.tree = None
         self.branch_lengths = None
 
-    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None,
-              plot=True) -> dict:
+    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
+
         print("Aligning...")
+        if len(self.structures) == 2:
+            dtw_aln_1, dtw_aln_2, _ = psa.get_pairwise_alignment(self.coords_array[0, :self.lengths_array[0]],
+                                                                 self.coords_array[1, :self.lengths_array[1]],
+                                                                 self.secondary_array[0, :self.lengths_array[0]],
+                                                                 self.secondary_array[1, :self.lengths_array[1]],
+                                                                 gamma,
+                                                                 gap_open_sec=gap_open_sec,
+                                                                 gap_extend_sec=gap_extend_sec,
+                                                                 gap_open_penalty=gap_open_penalty,
+                                                                 gap_extend_penalty=gap_extend_penalty)
+            return {self.structures[0].name: "".join([self.structures[0].sequence[i] if i != -1 else '-' for i in dtw_aln_1]),
+                    self.structures[1].name: "".join([self.structures[1].sequence[i] if i != -1 else '-' for i in dtw_aln_2])}
+
         if pw_matrix is None:
             pw_matrix = make_pairwise_dtw_score_matrix(self.coords_array,
                                                        self.secondary_array,
@@ -141,11 +177,16 @@ class StructureMultiple:
                                                        gamma,
                                                        gap_open_sec, gap_extend_sec,
                                                        gap_open_penalty, gap_extend_penalty)
+
+        print("Pairwise score matrix calculation done")
+
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
         self.final_structures = [s for s in self.structures]
         msa_alignments = {s.name: {s.name: s.sequence} for s in self.structures}
+
+        print("Neighbor joining tree constructed")
 
         def make_intermediate_node(n1, n2, n_int):
             name_1, name_2 = self.final_structures[n1].name, self.final_structures[n2].name
@@ -166,8 +207,7 @@ class StructureMultiple:
                                                                                                          gap_open_sec=gap_open_sec,
                                                                                                          gap_extend_sec=gap_extend_sec,
                                                                                                          gap_open_penalty=gap_open_penalty,
-                                                                                                         gap_extend_penalty=gap_extend_penalty,
-                                                                                                         plot=plot)
+                                                                                                         gap_extend_penalty=gap_extend_penalty)
             aln_coords_1[:, -1] *= 2. / len(msa_alignments[name_2])
             aln_coords_2[:, -1] *= 2. / len(msa_alignments[name_1])
             msa_alignments[name_1] = {name: "".join([sequence[i] if i != -1 else '-' for i in dtw_aln_1]) for name, sequence in
@@ -178,7 +218,7 @@ class StructureMultiple:
 
             mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2)
             mean_sec = get_mean_secondary(aln_sec_1, aln_sec_2, 0)
-            self.final_structures.append(Structure(name_int, None, mean_sec, mean_coords, add_column=False))
+            self.final_structures.append(Structure(name_int, None, mean_sec, None, mean_coords, add_column=False))
 
         for x in range(0, self.tree.shape[0] - 1, 2):
             node_1, node_2, node_int = self.tree[x, 0], self.tree[x + 1, 0], self.tree[x, 1]
@@ -191,6 +231,9 @@ class StructureMultiple:
         return alignment
 
     def superpose(self, alignments: dict):
+        """
+        Superpose structures according to alignment
+        """
         reference_index = 0
         reference_key = self.structures[reference_index].name
         core_indices = np.array([i for i in range(len(alignments[reference_key])) if '-' not in [alignments[n][i] for n in alignments]])
@@ -208,7 +251,7 @@ class StructureMultiple:
                 self.structures[i].coords[:, :3] = rmsd_calculations.apply_rotran(self.structures[i].coords[:, :3], rotation_matrix,
                                                                                   translation_matrix)
 
-    def make_pairwise_rmsd_matrix(self, alignments: dict, superpose_first: bool = True):
+    def make_pairwise_rmsd_coverage_matrix(self, alignments: dict, superpose_first: bool = True):
         """
         Find RMSDs and coverages of the alignment of each pair of sequences
 
@@ -238,8 +281,8 @@ class StructureMultiple:
                 else:
                     aln_1 = alignments[name_1]
                     aln_2 = alignments[name_2]
-                common_coords_1, common_coords_2 = psa.get_common_coordinates(self.structures[i].coords[:, :3],
-                                                                              self.structures[j].coords[:, :3], aln_1, aln_2)
+                common_coords_1, common_coords_2 = get_common_coordinates(self.structures[i].coords[:, :3],
+                                                                          self.structures[j].coords[:, :3], aln_1, aln_2)
                 assert common_coords_1.shape[0] > 0
                 if not superpose_first:
                     rot, tran = rmsd_calculations.svd_superimpose(common_coords_1, common_coords_2)
@@ -247,3 +290,21 @@ class StructureMultiple:
                 pairwise_rmsd_matrix[i, j] = pairwise_rmsd_matrix[j, i] = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
                 pairwise_coverage[i, j] = pairwise_coverage[j, i] = common_coords_1.shape[0] / len(aln_1)
         return pairwise_rmsd_matrix, pairwise_coverage
+
+    def get_aligned_features(self, alignments: dict):
+        """
+        Get dict of aligned features
+        """
+        feature_names = list(self.structures[0].features.keys())
+        aligned_features = {}
+        alignment_length = len(alignments[self.structures[0].name])
+        for feature_name in feature_names:
+            aligned_features[feature_name] = np.zeros((len(self.structures), alignment_length))
+            aligned_features[feature_name][:] = np.nan
+            for p in range(len(self.structures)):
+                farray = self.structures[p].features[feature_name]
+                if "gnm" in feature_name or "anm" in feature_name:
+                    farray = farray / np.nansum(farray ** 2) ** 0.5
+                indices = [i for i in range(alignment_length) if alignments[self.structures[p].name][i] != '-']
+                aligned_features[feature_name][p, indices] = farray
+        return aligned_features
