@@ -21,7 +21,7 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
                                    gap_open_penalty: float, gap_extend_penalty: float,
                                    gap_open_sec, gap_extend_sec):
     pairwise_matrix = np.zeros((coords_array.shape[0], coords_array.shape[0]))
-    for i in range(pairwise_matrix.shape[0] - 1):
+    for i in nb.prange(pairwise_matrix.shape[0] - 1):
         for j in range(i + 1, pairwise_matrix.shape[1]):
             dtw_aln_1, dtw_aln_2, score = psa.get_pairwise_alignment(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
                                                                      secondary_array[i, :lengths_array[i]], secondary_array[j, :lengths_array[j]],
@@ -315,6 +315,8 @@ class StructureMultiple:
         aligned_features = {}
         alignment_length = len(alignments[self.structures[0].name])
         for feature_name in feature_names:
+            if feature_name == "secondary":
+                continue
             aligned_features[feature_name] = np.zeros((len(self.structures), alignment_length))
             aligned_features[feature_name][:] = np.nan
             for p in range(len(self.structures)):
