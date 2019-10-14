@@ -131,8 +131,7 @@ class StructureMultiple:
         self.tree = None
         self.branch_lengths = None
 
-    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None,
-              plot=True) -> dict:
+    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
         print("Aligning...")
         if pw_matrix is None:
             pw_matrix = make_pairwise_dtw_score_matrix(self.coords_array,
@@ -166,8 +165,7 @@ class StructureMultiple:
                                                                                                          gap_open_sec=gap_open_sec,
                                                                                                          gap_extend_sec=gap_extend_sec,
                                                                                                          gap_open_penalty=gap_open_penalty,
-                                                                                                         gap_extend_penalty=gap_extend_penalty,
-                                                                                                         plot=plot)
+                                                                                                         gap_extend_penalty=gap_extend_penalty)
             aln_coords_1[:, -1] *= 2. / len(msa_alignments[name_2])
             aln_coords_2[:, -1] *= 2. / len(msa_alignments[name_1])
             msa_alignments[name_1] = {name: "".join([sequence[i] if i != -1 else '-' for i in dtw_aln_1]) for name, sequence in
