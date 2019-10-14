@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import numba as nb
 import numpy as np
+import prody as pd
 
 from caretta import neighbor_joining as nj
 from caretta import psa_numba as psa
@@ -141,6 +144,9 @@ class Structure:
 
 
 class StructureMultiple:
+    """
+    Class for multiple structure alignment
+    """
     def __init__(self, structures):
         self.structures = structures
         self.lengths_array = np.array([len(s.sequence) for s in self.structures])
@@ -308,3 +314,39 @@ class StructureMultiple:
                 indices = [i for i in range(alignment_length) if alignments[self.structures[p].name][i] != '-']
                 aligned_features[feature_name][p, indices] = farray
         return aligned_features
+
+    def write_superposed_pdbs(self, alignments: dict, input_pdb_folder, output_pdb_folder):
+        """
+        Superposes PDBs according to alignment and writes transformed PDBs to files
+        (View with Pymol)
+
+        Parameters
+        ----------
+        alignments
+        input_pdb_folder
+        output_pdb_folder
+        """
+        output_pdb_folder = Path(output_pdb_folder)
+        input_pdb_folder = Path(input_pdb_folder)
+        if not output_pdb_folder.exists():
+            output_pdb_folder.mkdir()
+        reference_name = self.structures[0].name
+        reference_pdb = pd.parsePDB(input_pdb_folder / f"{reference_name}.pdb")
+        core_indices = np.array([i for i in range(len(alignments[reference_name])) if '-' not in [alignments[n][i] for n in alignments]])
+        aln_ref = helper.aligned_string_to_array(alignments[reference_name])
+        ref_coords_core = reference_pdb[helper.get_alpha_indices(reference_pdb)].getCoords().astype(np.float64)[
+            np.array([aln_ref[c] for c in core_indices])]
+        ref_centroid = rmsd_calculations.nb_mean_axis_0(ref_coords_core)
+        transformation = pd.Transformation(np.eye(3), -ref_centroid)
+        reference_pdb = pd.parsePDB(input_pdb_folder / f"{reference_name}.pdb")
+        reference_pdb = pd.applyTransformation(transformation, reference_pdb)
+        pd.writePDB(str(output_pdb_folder / f"{reference_name}.pdb"), reference_pdb)
+        for i in range(1, len(self.structures)):
+            name = self.structures[i].name
+            pdb = pd.parsePDB(input_pdb_folder / f"{name}.pdb")
+            aln_name = helper.aligned_string_to_array(alignments[name])
+            common_coords_2 = pdb[helper.get_alpha_indices(pdb)].getCoords().astype(np.float64)[np.array([aln_name[c] for c in core_indices])]
+            rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(ref_coords_core, common_coords_2)
+            transformation = pd.Transformation(rotation_matrix, translation_matrix)
+            pdb = pd.applyTransformation(transformation, pdb)
+            pd.writePDB(str(output_pdb_folder / f"{name}.pdb"), pdb)
