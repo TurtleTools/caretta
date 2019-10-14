@@ -2,3 +2,4 @@ prody
 numpy
 numba
 scipy
+biopython
