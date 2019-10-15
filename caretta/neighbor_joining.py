@@ -2,9 +2,6 @@ import numba as nb
 import numpy as np
 
 
-# from setup import numba_cc
-
-
 # Neighbor joining takes as input a distance matrix specifying the distance between each pair of taxa.
 # The algorithm starts with a completely unresolved tree, whose topology corresponds to that of a star network,
 # and iterates over the following steps until the tree is completely resolved and all branch lengths are known:

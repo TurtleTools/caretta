@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import fire
 
 from caretta import msa_numba
@@ -6,10 +8,10 @@ from caretta import msa_numba
 def align_cli(input_pdb,
               dssp_dir="caretta_tmp", num_threads=20, extract_all_features=True,
               gap_open_penalty=1., gap_extend_penalty=0.01, consensus_weight=1.,
-              write_fasta=True, output_fasta_filename=None,
-              write_pdb=True, output_pdb_folder=None,
-              write_features=True, output_feature_filename=None,
-              write_class=True, output_class_filename=None,
+              write_fasta=True, output_fasta_filename=Path("./result.fasta"),
+              write_pdb=True, output_pdb_folder=Path("./result_pdb/"),
+              write_features=True, output_feature_filename=Path("./result_features.pkl"),
+              write_class=True, output_class_filename=Path("./result_class.pkl"),
               overwrite_dssp=False):
     """
     Caretta aligns protein structures and returns a sequence alignment, a set of aligned feature matrices, superposed PDB files, and

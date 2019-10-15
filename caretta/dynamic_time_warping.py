@@ -1,8 +1,6 @@
 import numba as nb
 import numpy as np
 
-# from setup import numba_cc
-
 MINV = np.finfo(np.float64).min
 
 

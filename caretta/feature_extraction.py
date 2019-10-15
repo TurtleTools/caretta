@@ -8,8 +8,6 @@ from Bio.PDB.ResidueDepth import get_surface, residue_depth, ca_depth, min_dist
 
 from caretta import helper
 
-pd.confProDy(verbosity='none')
-
 
 def get_residue_depths(pdb_file):
     """

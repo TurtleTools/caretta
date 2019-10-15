@@ -8,12 +8,6 @@ import numpy as np
 import prody as pd
 
 
-# from setup import numba_cc
-
-
-# pd.confProDy(verbosity='none')
-
-
 @nb.njit
 # @numba_cc.export('nan_normalize', 'f64[:](f64[:])')
 def nan_normalize(numbers):

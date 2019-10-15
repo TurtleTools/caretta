@@ -1,10 +1,6 @@
 import numba as nb
 import numpy as np
 
-
-# from setup import numba_cc
-
-
 @nb.njit
 # @numba_cc.export('normalize', 'f64[:](f64[:])')
 def normalize(numbers):

@@ -180,24 +180,20 @@ class StructureMultiple:
     output_files: OutputFiles = OutputFiles()
 
     @classmethod
-    def from_structures(cls, structures: typing.List[Structure], output_fasta_filename=Path("./result.fasta"),
+    def from_structures(cls, structures: typing.List[Structure],
+                        output_fasta_filename=Path("./result.fasta"),
                         output_pdb_folder=Path("./result_pdb/"),
                         output_feature_filename=Path("./result_features.pkl"),
                         output_class_filename=Path("./result_class.pkl")):
-        cls.structures = structures
-        cls.lengths_array = np.array([len(s.sequence) for s in cls.structures])
-        cls.max_length = np.max(cls.lengths_array)
-        cls.coords_array = np.zeros((len(cls.structures), cls.max_length, cls.structures[0].coords.shape[1]))
-        cls.secondary_array = np.zeros((len(cls.structures), cls.max_length))
-        for i in range(len(cls.structures)):
-            cls.coords_array[i, :cls.lengths_array[i]] = cls.structures[i].coords
-            cls.secondary_array[i, :cls.lengths_array[i]] = cls.structures[i].secondary
-        cls.final_structures = []
-        cls.tree = None
-        cls.branch_lengths = None
-        cls.alignment = None
-        cls.output_files = OutputFiles(output_fasta_filename, output_pdb_folder, output_feature_filename, output_class_filename)
-        return cls
+        lengths_array = np.array([len(s.sequence) for s in structures])
+        max_length = np.max(lengths_array)
+        coords_array = np.zeros((len(structures), max_length, structures[0].coords.shape[1]))
+        secondary_array = np.zeros((len(structures), max_length))
+        for i in range(len(structures)):
+            coords_array[i, :lengths_array[i]] = structures[i].coords
+            secondary_array[i, :lengths_array[i]] = structures[i].secondary
+        output_files = OutputFiles(output_fasta_filename, output_pdb_folder, output_feature_filename, output_class_filename)
+        return cls(structures, lengths_array, max_length, coords_array, secondary_array, output_files=output_files)
 
     @classmethod
     def from_pdb_files(cls, input_pdb,
@@ -217,6 +213,7 @@ class StructureMultiple:
         coordinates = [np.hstack((pdbs[i][alpha_indices[i]].getCoords().astype(np.float64), np.zeros((len(sequences[i]), 1)) + consensus_weight))
                        for i in range(len(pdbs))]
         only_dssp = (not extract_all_features)
+        print("Extracting features...")
         features = feature_extraction.get_features_multiple(pdb_files, str(dssp_dir),
                                                             num_threads=num_threads, only_dssp=only_dssp, force_overwrite=force)
         structures = []
@@ -228,16 +225,18 @@ class StructureMultiple:
                                         helper.secondary_to_array(features[i]["secondary"]),
                                         features[i],
                                         coordinates[i]))
-        return cls.from_structures(structures, output_fasta_filename, output_pdb_folder, output_feature_filename, output_class_filename)
+        msa_class = StructureMultiple.from_structures(structures, output_fasta_filename, output_pdb_folder, output_feature_filename,
+                                                      output_class_filename)
+        return msa_class
 
-    @classmethod
-    def align_from_pdb_files(cls, input_pdb,
+    @staticmethod
+    def align_from_pdb_files(input_pdb,
                              dssp_dir="caretta_tmp", num_threads=20, extract_all_features=True,
                              gap_open_penalty=1., gap_extend_penalty=0.01, consensus_weight=1.,
-                             write_fasta=True, output_fasta_filename=None,
-                             write_pdb=True, output_pdb_folder=None,
-                             write_features=True, output_feature_filename=None,
-                             write_class=True, output_class_filename=None,
+                             write_fasta=True, output_fasta_filename=Path("./result.fasta"),
+                             write_pdb=True, output_pdb_folder=Path("./result_pdb/"),
+                             write_features=True, output_feature_filename=Path("./result_features.pkl"),
+                             write_class=True, output_class_filename=Path("./result_class.pkl"),
                              overwrite_dssp=False):
         """
         Caretta aligns protein structures and returns a sequence alignment, a set of aligned feature matrices, superposed PDB files, and
@@ -287,20 +286,20 @@ class StructureMultiple:
         -------
         StructureMultiple class
         """
-        cls.from_pdb_files(input_pdb,
-                           dssp_dir, num_threads, extract_all_features,
-                           consensus_weight,
-                           output_fasta_filename,
-                           output_pdb_folder,
-                           output_feature_filename,
-                           output_class_filename,
-                           overwrite_dssp)
-        cls.align(cls, gap_open_penalty, gap_extend_penalty)
-        cls.write_files(cls, write_fasta,
-                        write_pdb,
-                        write_features,
-                        write_class)
-        return cls
+        msa_class = StructureMultiple.from_pdb_files(input_pdb,
+                                                     dssp_dir, num_threads, extract_all_features,
+                                                     consensus_weight,
+                                                     output_fasta_filename,
+                                                     output_pdb_folder,
+                                                     output_feature_filename,
+                                                     output_class_filename,
+                                                     overwrite_dssp)
+        msa_class.align(gap_open_penalty, gap_extend_penalty)
+        msa_class.write_files(write_fasta,
+                              write_pdb,
+                              write_features,
+                              write_class)
+        return msa_class
 
     def align(self, gap_open_penalty, gap_extend_penalty, pw_matrix=None, gamma=0.03, gap_open_sec=1., gap_extend_sec=0.1) -> dict:
         print("Aligning...")
@@ -383,6 +382,8 @@ class StructureMultiple:
                     write_pdb=True,
                     write_features=True,
                     write_class=True):
+        if any((write_fasta, write_pdb, write_pdb, write_class)):
+            print("Writing files...")
         if write_fasta:
             self.write_alignment(self.output_files.fasta_file)
         if write_pdb:
