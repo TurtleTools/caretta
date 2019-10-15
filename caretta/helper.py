@@ -8,10 +8,6 @@ import numpy as np
 import prody as pd
 
 pd.confProDy(verbosity='none')
-@nb.njit
-def normalize(numbers):
-    minv, maxv = np.min(numbers), np.max(numbers)
-    return (numbers - minv) / (maxv - minv)
 
 
 @nb.njit
@@ -127,9 +123,10 @@ def get_alpha_indices(protein):
     return [a.getIndex() for a in protein.iterAtoms() if a.getName() == 'CA']
 
 
-def get_beta_indices_clean(protein: pd.AtomGroup) -> list:
+def get_beta_indices(protein: pd.AtomGroup) -> list:
     """
     Get indices of beta carbons of pd AtomGroup object
+    (If beta carbon doesn't exist, alpha carbon index is returned)
     """
     residue_splits = group_indices(protein.getResindices())
     i = 0
@@ -176,15 +173,6 @@ def group_indices(input_list: list) -> list:
         current_index = input_list[i]
     output_list.append(current_list)
     return output_list
-
-
-def get_beta_indices(protein: pd.AtomGroup) -> list:
-    """
-    Get indices of beta carbons of pd AtomGroup object
-    (alpha if Gly)
-    """
-    return [a.getIndex() for a in protein.iterAtoms() if
-            (a.getResname() != 'GLY' and a.getName() == 'CB') or (a.getResname() == 'GLY' and a.getName() == 'CA')]
 
 
 def clustal_msa_from_sequences(sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None):
