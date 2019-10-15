@@ -1,7 +1,7 @@
 import base64
-import json
 import os
 import pickle
+from pathlib import Path
 
 import dash
 import dash_bio as dashbio
@@ -10,11 +10,13 @@ import dash_html_components as html
 import flask
 import numpy as np
 import requests as rq
-from dash_bio_utils import pdb_parser as parser
 
 from caretta import helper
 # from caretta_pfam.pfam import PfamToPDB, PdbEntry, superimpose, get_pdbs_from_folder, run_chosen_entries
 from caretta.pfam import PfamToPDB, get_pdbs_from_folder
+
+if not Path("static").exists():
+    Path("static").mkdir()
 
 external_stylesheets = ["https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css"]
 
@@ -28,8 +30,6 @@ styles_data = rq.get(
     'https://raw.githubusercontent.com/plotly/dash-bio-docs-files/master/' +
     'mol3d/styles_data.js'
 ).json()
-
-shitty_model = json.loads(parser.create_data("./1AAC.pdb"))
 
 
 def heatmap(core_features, zeros=False):
@@ -130,36 +130,6 @@ def write_as_csv_all_features(feature_dict, file_name):
     f.close()
 
 
-def model_combine(files):
-    model_data = {"atoms": [], "bonds": []}
-    residue_index = 0
-    atom_index = len(model_data["atoms"])
-    for f in files:
-        model = json.loads(parser.create_data(f))
-        for atom in model["atoms"]:
-            atom["residue_index"] += residue_index
-            model_data["atoms"].append(atom)
-        for bond in model["bonds"]:
-            bond["atom2_index"] += atom_index
-            bond["atom1_index"] += atom_index
-            model_data["bonds"].append(bond)
-        residue_index = model_data["atoms"][-1]["residue_index"]
-        atom_index = len(model_data["atoms"])
-    return model_data
-
-
-print(model_data.keys())
-print(model_data["atoms"][0].keys())
-print(model_data["atoms"][:3])
-print(model_data["bonds"][0].keys())
-print(model_data["bonds"][0:3])
-print("parser stuff:")
-print(shitty_model.keys())
-print(shitty_model["atoms"][0].keys())
-print(shitty_model["atoms"][:3])
-print(shitty_model["bonds"][0].keys())
-print(shitty_model["bonds"][0:3])
-
 box_style = {"box-shadow": "1px 3px 20px -4px rgba(0,0,0,0.75)",
              "border-radius": "5px", "background-color": "#f9f7f7"}
 
@@ -177,15 +147,6 @@ box_style_lr = {"top-margin": 25,
                 "border-radius": "5px",
                 "background-color": "#ffbaba"}
 
-
-def molecule_loader(pdb_filename):
-    return dashbio.Molecule3dViewer(id="protein", modelData=json.loads(parser.create_data(pdb_filename)),
-                                    styles=styles_data)
-
-
-def structural_alignment_loader(file_names):
-    model_data = model_combine(file_names)
-    return dashbio.Molecule3dViewer(id="proteins", modelData=model_data)
 
 
 def compress_object(raw_object):
@@ -556,4 +517,4 @@ def update_features(clickdata_3d, clickdata_feature, feature_data, scatter3d_dat
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True, host="0.0.0.0", port=3002)
+    app.run_server(debug=True, host="localhost", port=3002)

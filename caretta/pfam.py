@@ -98,7 +98,7 @@ class PfamToPDB:
         for line in data_lines:
             try:
                 current_data = PdbEntry.from_data_line(line)
-            except TypeError:
+            except:
                 continue
             if current_data.PFAM_ACC in self.pfam_to_pdb_ids:
                 self.pfam_to_pdb_ids[current_data.PFAM_ACC].append(current_data)
@@ -122,7 +122,7 @@ class PfamToPDB:
                                                gap_open_penalty=0.1,
                                                gap_extend_penalty=0.001):
 
-        self.msa = PfamStructures(pdb_entries)
+        self.msa = PfamStructures.from_pdb_files([p.get_pdb()[1] for p in pdb_entries])
         self.caretta_alignment = self.msa.align(gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty)
 
         # objs_features = [x.get_features() for x in pdb_entries]

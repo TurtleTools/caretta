@@ -149,16 +149,20 @@ class OutputFiles:
 
 
 def parse_pdb_files(input_pdb: str) -> typing.List[typing.Union[str, Path]]:
-    input_pdb = Path(input_pdb)
-    if input_pdb.is_dir():
-        pdb_files = list(Path(input_pdb).glob("*.pdb"))
-    elif input_pdb.is_file():
-        with open(input_pdb) as f:
-            pdb_files = f.read().strip().split('\n')
+    if type(input_pdb) == str:
+        input_pdb = Path(input_pdb)
+        if input_pdb.is_dir():
+            pdb_files = list(input_pdb.glob("*.pdb"))
+        elif input_pdb.is_file():
+            with open(input_pdb) as f:
+                pdb_files = f.read().strip().split('\n')
+        else:
+            print("Weird string")  # TODO throw error
+            return []
     else:
         pdb_files = list(input_pdb)
-    if not Path(pdb_files[0]).is_file():
-        pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
+        if not Path(pdb_files[0]).is_file():
+            pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
     print(f"Found {len(pdb_files)} PDB files")
     return pdb_files
 
