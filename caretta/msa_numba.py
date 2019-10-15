@@ -1,4 +1,5 @@
 from pathlib import Path
+from dataclasses import dataclass
 
 import numba as nb
 import numpy as np
@@ -7,6 +8,8 @@ import prody as pd
 from caretta import neighbor_joining as nj
 from caretta import psa_numba as psa
 from caretta import rmsd_calculations, helper
+from caretta.main import get_structures
+import pickle
 
 
 @nb.njit
@@ -143,6 +146,15 @@ class Structure:
             self.coords = coords
 
 
+@dataclass
+class OutputFiles:
+    fasta_path: Path = Path("./result.fasta")
+    dssp_path: Path = Path("./caretta_tmp/")
+    pdb_folder: Path = Path("./result_pdb/")
+    class_path: Path = Path("./result_class.pkl")
+    feature_path: Path = Path("./result_features.pkl")
+
+
 class StructureMultiple:
     """
     Class for multiple structure alignment
@@ -160,6 +172,105 @@ class StructureMultiple:
         self.tree = None
         self.branch_lengths = None
         self.alignment = None
+        self.outpufiles = OutputFiles()
+
+    @classmethod
+    def from_pdbs_align(cls, input_pdb,
+                        dssp_dir="caretta_tmp", num_threads=20, extract_all_features=True,
+                        gap_open_penalty=1., gap_extend_penalty=0.01, consensus_weight=1.,
+                        write_fasta=True, output_fasta_filename=None,
+                        write_pdb=True, output_pdb_folder=None,
+                        write_features=True, output_feature_filename=None,
+                        write_class=True, output_class_filename=None,
+                        force=False):
+        """
+        Caretta aligns protein structures and returns a sequence alignment, a set of aligned feature matrices, superposed PDB files, and
+        a class with intermediate structures made during progressive alignment.
+        Parameters
+        ----------
+        input_pdb
+            Can be
+            A list of PDB files
+            A list of PDB IDs
+            A folder with input protein files
+            A file which lists PDB filenames on each line
+            A file which lists PDB IDs on each line
+        dssp_dir
+            Folder to store temp DSSP files (default caretta_tmp)
+        num_threads
+            Number of threads to use for feature extraction
+        extract_all_features
+            True => obtains all features (default True) \n
+            False => only DSSP features (faster)
+        gap_open_penalty
+            default 1
+        gap_extend_penalty
+            default 0.01
+        consensus_weight
+            default 1
+        write_fasta
+            True => writes alignment as fasta file (default True)
+        output_fasta_filename
+            Fasta file of alignment (default result.fasta)
+        write_pdb
+            True => writes all protein PDB files superposed by alignment (default True)
+        output_pdb_folder
+            Folder to write superposed PDB files (default result_pdb)
+        write_features
+            True => writes aligned features as a dictionary of numpy arrays into a pickle file (default True)
+        output_feature_filename
+            Pickle file to write aligned features (default result_features.pkl)
+        write_class
+            True => writes StructureMultiple class with intermediate structures and tree to pickle file (default True)
+        output_class_filename
+            Pickle file to write StructureMultiple class (default result_class.pkl)
+        force
+            Forces DSSP to rerun (default False)
+
+        Returns
+        -------
+        StructureMultiple class
+        """
+        if not Path(dssp_dir).exists():
+            Path(dssp_dir).mkdir()
+        input_pdb = Path(input_pdb)
+        if input_pdb.is_dir():
+            pdb_files = list(Path(input_pdb).glob("*.pdb"))
+        elif input_pdb.is_file():
+            with open(input_pdb) as f:
+                pdb_files = f.read().strip().split('\n')
+        else:
+            pdb_files = list(input_pdb)
+        if not Path(pdb_files[0]).is_file():
+            pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
+        print(f"Found {len(pdb_files)} PDB files")
+        structures = get_structures(pdb_files, dssp_dir, consensus_weight, num_threads=num_threads,
+                                    extract_all_features=extract_all_features,
+                                    force_overwrite=force)
+        msa_class = cls(structures)
+        msa_class.align(gamma=0.03, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=gap_open_penalty,
+                        gap_extend_penalty=gap_extend_penalty, consensus_weight=consensus_weight)
+        if write_fasta:
+            if output_fasta_filename is None:
+                output_fasta_filename = "result.fasta"
+            msa_class.write_alignment(output_fasta_filename)
+        if write_pdb:
+            if output_pdb_folder is None:
+                output_pdb_folder = Path("result_pdb")
+                if not output_pdb_folder.exists():
+                    output_pdb_folder.mkdir()
+            msa_class.write_superposed_pdbs(output_pdb_folder)
+        if write_features:
+            if output_feature_filename is None:
+                output_feature_filename = "result_features.pkl"
+            with open(output_feature_filename, "wb") as f:
+                pickle.dump(msa_class.get_aligned_features(), f)
+        if write_class:
+            if output_class_filename is None:
+                output_class_filename = "result_class.pkl"
+            with open(output_class_filename, "wb") as f:
+                pickle.dump(msa_class, f)
+        return msa_class
 
     def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, consensus_weight, pw_matrix=None) -> dict:
 
