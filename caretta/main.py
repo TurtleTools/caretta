@@ -89,7 +89,7 @@ def align(input_pdb,
     output_pdb_folder
         Folder to write superposed PDB files (default result_pdb)
     write_features
-        True => writes aligned features a s a dictionary of numpy arrays into a pickle file (default True)
+        True => writes aligned features as a dictionary of numpy arrays into a pickle file (default True)
     output_feature_filename
         Pickle file to write aligned features (default result_features.pkl)
     write_class
