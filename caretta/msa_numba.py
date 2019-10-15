@@ -1,3 +1,4 @@
+import pickle
 import typing
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -139,50 +140,77 @@ class Structure:
         return cls(pdb_name, pdb_file, sequence, helper.secondary_to_array(features["secondary"]), features, coordinates)
 
 
-# class Structure:
-#     def __init__(self, name, pdb_file, sequence, secondary, features, coords, add_column=True, consensus_weight=1.):
-#         """
-#         Makes a Structure object
-#
-#         Parameters
-#         ----------
-#         name
-#         sequence
-#         secondary
-#         features
-#             dict of features
-#         coords
-#             array of alpha carbon coordinates
-#         add_column
-#             adds a column for consensus weight if True
-#         """
-#         self.name = name
-#         self.pdb_file = pdb_file
-#         self.sequence = sequence
-#         self.secondary = secondary
-#         self.features = features
-#         if add_column:
-#             add = np.zeros((coords.shape[0], 1)) + consensus_weight
-#             self.coords = np.hstack((coords, add))
-#         else:
-#             self.coords = coords
+@dataclass
+class OutputFiles:
+    fasta_file: Path = Path("./result.fasta")
+    pdb_folder: Path = Path("./result_pdb/")
+    feature_file: Path = Path("./result_features.pkl")
+    class_file: Path = Path("./result_class.pkl")
+
+
+def parse_pdb_files(input_pdb: str) -> typing.List[typing.Union[str, Path]]:
+    input_pdb = Path(input_pdb)
+    if input_pdb.is_dir():
+        pdb_files = list(Path(input_pdb).glob("*.pdb"))
+    elif input_pdb.is_file():
+        with open(input_pdb) as f:
+            pdb_files = f.read().strip().split('\n')
+    else:
+        pdb_files = list(input_pdb)
+    if not Path(pdb_files[0]).is_file():
+        pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
+    print(f"Found {len(pdb_files)} PDB files")
+    return pdb_files
 
 
 @dataclass
-class OutputFiles:
-    fasta_path: Path = Path("./result.fasta")
-    dssp_path: Path = Path("./caretta_tmp/")
-    pdb_folder: Path = Path("./result_pdb/")
-    class_path: Path = Path("./result_class.pkl")
-    feature_path: Path = Path("./result_features.pkl")
-
-
 class StructureMultiple:
     """
     Class for multiple structure alignment
     """
+    structures: typing.Union[None, typing.List[Structure]] = None
+    lengths_array: typing.Union[None, np.ndarray] = None
+    max_length: int = 0
+    coords_array: typing.Union[None, np.ndarray] = None
+    secondary_array: typing.Union[None, np.ndarray] = None
+    final_structures: typing.Union[None, typing.List[Structure]] = None
+    tree: typing.Union[None, np.ndarray] = None
+    branch_lengths: typing.Union[None, np.ndarray] = None
+    alignment: typing.Union[None, dict] = None
+    output_files: OutputFiles = OutputFiles()
 
-    def __init__(self, pdb_files, dssp_dir, consensus_weight=1., num_threads=20, extract_all_features=True, force_overwrite=False):
+    @classmethod
+    def from_structures(cls, structures: typing.List[Structure], output_fasta_filename=Path("./result.fasta"),
+                        output_pdb_folder=Path("./result_pdb/"),
+                        output_feature_filename=Path("./result_features.pkl"),
+                        output_class_filename=Path("./result_class.pkl")):
+        cls.structures = structures
+        cls.lengths_array = np.array([len(s.sequence) for s in cls.structures])
+        cls.max_length = np.max(cls.lengths_array)
+        cls.coords_array = np.zeros((len(cls.structures), cls.max_length, cls.structures[0].coords.shape[1]))
+        cls.secondary_array = np.zeros((len(cls.structures), cls.max_length))
+        for i in range(len(cls.structures)):
+            cls.coords_array[i, :cls.lengths_array[i]] = cls.structures[i].coords
+            cls.secondary_array[i, :cls.lengths_array[i]] = cls.structures[i].secondary
+        cls.final_structures = []
+        cls.tree = None
+        cls.branch_lengths = None
+        cls.alignment = None
+        cls.output_files = OutputFiles(output_fasta_filename, output_pdb_folder, output_feature_filename, output_class_filename)
+        return cls
+
+    @classmethod
+    def from_pdb_files(cls, input_pdb,
+                       dssp_dir=Path("./caretta_tmp/"), num_threads=20, extract_all_features=True,
+                       consensus_weight=1.,
+                       output_fasta_filename=Path("./result.fasta"),
+                       output_pdb_folder=Path("./result_pdb/"),
+                       output_feature_filename=Path("./result_features.pkl"),
+                       output_class_filename=Path("./result_class.pkl"),
+                       force=False):
+        pdb_files = parse_pdb_files(input_pdb)
+        if not Path(dssp_dir).exists():
+            Path(dssp_dir).mkdir()
         pdbs = [pd.parsePDB(filename) for filename in pdb_files]
         alpha_indices = [helper.get_alpha_indices(pdb) for pdb in pdbs]
         sequences = [pdbs[i][alpha_indices[i]].getSequence() for i in range(len(pdbs))]
@@ -190,50 +218,39 @@ class StructureMultiple:
                        for i in range(len(pdbs))]
         only_dssp = (not extract_all_features)
         features = feature_extraction.get_features_multiple(pdb_files, str(dssp_dir),
-                                                            num_threads=num_threads, only_dssp=only_dssp, force_overwrite=force_overwrite)
-        self.structures = []
+                                                            num_threads=num_threads, only_dssp=only_dssp, force_overwrite=force)
+        structures = []
         for i in range(len(pdbs)):
             pdb_name = helper.get_file_parts(pdb_files[i])[1]
-            self.structures.append(Structure(pdb_name,
-                                             pdb_files[i],
-                                             sequences[i],
-                                             helper.secondary_to_array(features[i]["secondary"]),
-                                             features[i],
-                                             coordinates[i]))
-        self.lengths_array = np.array([len(s.sequence) for s in self.structures])
-        self.max_length = np.max(self.lengths_array)
-        self.coords_array = np.zeros((len(self.structures), self.max_length, self.structures[0].coords.shape[1]))
-        self.secondary_array = np.zeros((len(self.structures), self.max_length))
-        for i in range(len(self.structures)):
-            self.coords_array[i, :self.lengths_array[i]] = self.structures[i].coords
-            self.secondary_array[i, :self.lengths_array[i]] = self.structures[i].secondary
-        self.final_structures = []
-        self.tree = None
-        self.branch_lengths = None
-        self.alignment = None
-        self.outpufiles = OutputFiles()
+            structures.append(Structure(pdb_name,
+                                        pdb_files[i],
+                                        sequences[i],
+                                        helper.secondary_to_array(features[i]["secondary"]),
+                                        features[i],
+                                        coordinates[i]))
+        return cls.from_structures(structures, output_fasta_filename, output_pdb_folder, output_feature_filename, output_class_filename)
 
     @classmethod
-    def from_pdbs_align(cls, input_pdb,
-                        dssp_dir="caretta_tmp", num_threads=20, extract_all_features=True,
-                        gap_open_penalty=1., gap_extend_penalty=0.01, consensus_weight=1.,
-                        write_fasta=True, output_fasta_filename=None,
-                        write_pdb=True, output_pdb_folder=None,
-                        write_features=True, output_feature_filename=None,
-                        write_class=True, output_class_filename=None,
-                        force=False):
+    def align_from_pdb_files(cls, input_pdb,
+                             dssp_dir="caretta_tmp", num_threads=20, extract_all_features=True,
+                             gap_open_penalty=1., gap_extend_penalty=0.01, consensus_weight=1.,
+                             write_fasta=True, output_fasta_filename=None,
+                             write_pdb=True, output_pdb_folder=None,
+                             write_features=True, output_feature_filename=None,
+                             write_class=True, output_class_filename=None,
+                             overwrite_dssp=False):
         """
         Caretta aligns protein structures and returns a sequence alignment, a set of aligned feature matrices, superposed PDB files, and
         a class with intermediate structures made during progressive alignment.
         Parameters
         ----------
         input_pdb
-            Can be
+            Can be \n
             A list of PDB files
             A list of PDB IDs
-            A folder with input protein files
-            A file which lists PDB filenames on each line
-            A file which lists PDB IDs on each line
+            A folder with input protein files \n
+            A file which lists PDB filenames on each line \n
+            A file which lists PDB IDs on each line \n
         dssp_dir
             Folder to store temp DSSP files (default caretta_tmp)
         num_threads
@@ -256,62 +273,36 @@ class StructureMultiple:
         output_pdb_folder
             Folder to write superposed PDB files (default result_pdb)
         write_features
-            True => writes aligned features as a dictionary of numpy arrays into a pickle file (default True)
+            True => writes aligned features a s a dictionary of numpy arrays into a pickle file (default True)
         output_feature_filename
             Pickle file to write aligned features (default result_features.pkl)
         write_class
             True => writes StructureMultiple class with intermediate structures and tree to pickle file (default True)
         output_class_filename
             Pickle file to write StructureMultiple class (default result_class.pkl)
-        force
+        overwrite_dssp
             Forces DSSP to rerun (default False)
 
         Returns
         -------
         StructureMultiple class
         """
-        if not Path(dssp_dir).exists():
-            Path(dssp_dir).mkdir()
-        input_pdb = Path(input_pdb)
-        if input_pdb.is_dir():
-            pdb_files = list(Path(input_pdb).glob("*.pdb"))
-        elif input_pdb.is_file():
-            with open(input_pdb) as f:
-                pdb_files = f.read().strip().split('\n')
-        else:
-            pdb_files = list(input_pdb)
-        if not Path(pdb_files[0]).is_file():
-            pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
-        print(f"Found {len(pdb_files)} PDB files")
-        structures = get_structures(pdb_files, dssp_dir, consensus_weight, num_threads=num_threads,
-                                    extract_all_features=extract_all_features,
-                                    force_overwrite=force)
-        msa_class = cls(structures)
-        msa_class.align(gamma=0.03, gap_open_sec=1, gap_extend_sec=0.1, gap_open_penalty=gap_open_penalty,
-                        gap_extend_penalty=gap_extend_penalty, consensus_weight=consensus_weight)
-        if write_fasta:
-            if output_fasta_filename is None:
-                output_fasta_filename = "result.fasta"
-            msa_class.write_alignment(output_fasta_filename)
-        if write_pdb:
-            if output_pdb_folder is None:
-                output_pdb_folder = Path("result_pdb")
-                if not output_pdb_folder.exists():
-                    output_pdb_folder.mkdir()
-            msa_class.write_superposed_pdbs(output_pdb_folder)
-        if write_features:
-            if output_feature_filename is None:
-                output_feature_filename = "result_features.pkl"
-            with open(output_feature_filename, "wb") as f:
-                pickle.dump(msa_class.get_aligned_features(), f)
-        if write_class:
-            if output_class_filename is None:
-                output_class_filename = "result_class.pkl"
-            with open(output_class_filename, "wb") as f:
-                pickle.dump(msa_class, f)
-        return msa_class
+        cls.from_pdb_files(input_pdb,
+                           dssp_dir, num_threads, extract_all_features,
+                           consensus_weight,
+                           output_fasta_filename,
+                           output_pdb_folder,
+                           output_feature_filename,
+                           output_class_filename,
+                           overwrite_dssp)
+        cls.align(cls, gap_open_penalty, gap_extend_penalty)
+        cls.write_files(cls, write_fasta,
+                        write_pdb,
+                        write_features,
+                        write_class)
+        return cls
 
-    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
+    def align(self, gap_open_penalty, gap_extend_penalty, pw_matrix=None, gamma=0.03, gap_open_sec=1., gap_extend_sec=0.1) -> dict:
         print("Aligning...")
         if len(self.structures) == 2:
             dtw_1, dtw_2, _ = psa.get_pairwise_alignment(self.coords_array[0, :self.lengths_array[0]],
@@ -387,6 +378,23 @@ class StructureMultiple:
         alignment = {**msa_alignments[self.final_structures[node_1].name], **msa_alignments[self.final_structures[node_2].name]}
         self.alignment = alignment
         return alignment
+
+    def write_files(self, write_fasta=True,
+                    write_pdb=True,
+                    write_features=True,
+                    write_class=True):
+        if write_fasta:
+            self.write_alignment(self.output_files.fasta_file)
+        if write_pdb:
+            if not self.output_files.pdb_folder.exists():
+                self.output_files.pdb_folder.mkdir()
+            self.write_superposed_pdbs(self.output_files.pdb_folder)
+        if write_features:
+            with open(str(self.output_files.feature_file), "wb") as f:
+                pickle.dump(self.get_aligned_features(), f)
+        if write_class:
+            with open(str(self.output_files.class_file), "wb") as f:
+                pickle.dump(self, f)
 
     def superpose(self, alignments: dict = None):
         """
