@@ -139,35 +139,6 @@ class Structure:
         return cls(pdb_name, pdb_file, sequence, helper.secondary_to_array(features["secondary"]), features, coordinates)
 
 
-# class Structure:
-#     def __init__(self, name, pdb_file, sequence, secondary, features, coords, add_column=True, consensus_weight=1.):
-#         """
-#         Makes a Structure object
-#
-#         Parameters
-#         ----------
-#         name
-#         sequence
-#         secondary
-#         features
-#             dict of features
-#         coords
-#             array of alpha carbon coordinates
-#         add_column
-#             adds a column for consensus weight if True
-#         """
-#         self.name = name
-#         self.pdb_file = pdb_file
-#         self.sequence = sequence
-#         self.secondary = secondary
-#         self.features = features
-#         if add_column:
-#             add = np.zeros((coords.shape[0], 1)) + consensus_weight
-#             self.coords = np.hstack((coords, add))
-#         else:
-#             self.coords = coords
-
-
 @dataclass
 class OutputFiles:
     fasta_path: Path = Path("./result.fasta")
