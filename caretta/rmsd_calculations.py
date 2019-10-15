@@ -1,14 +1,18 @@
 import numba as nb
 import numpy as np
 
+from setup import numba_cc
+
 
 @nb.njit
+@numba_cc.export('normalize', 'f64[:](f64[:])')
 def normalize(numbers):
     minv, maxv = np.min(numbers), np.max(numbers)
     return (numbers - minv) / (maxv - minv)
 
 
 @nb.njit
+@numba_cc.export('nb_mean_axis_0', 'f64[:](f64[:])')
 def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
     """
     Same as np.mean(array, axis=0) but njitted
@@ -20,6 +24,7 @@ def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
 
 
 @nb.njit
+@numba_cc.export('svd_superimpose', '(f64[:], f64[:])')
 def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
     """
     Superimpose paired coordinates on each other using svd
@@ -49,6 +54,7 @@ def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
 
 
 @nb.njit
+@numba_cc.export('apply_rotran', '(f64[:], f64[:], f64[:])')
 def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_matrix: np.ndarray) -> np.ndarray:
     """
     Applies a rotation and translation matrix onto coordinates
@@ -66,7 +72,7 @@ def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_ma
     return np.dot(coords, rotation_matrix) + translation_matrix
 
 
-@nb.njit
+@numba_cc.export('superpose_with_pos', '(f64[:], f64[:], f64[:], f64[:])')
 def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
     """
     Superpose two sets of un-aligned coordinates using smaller subsets of aligned coordinates
@@ -90,6 +96,7 @@ def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
 
 
 @nb.njit
+@numba_cc.export('make_distance_matrix', '(f64[:], f64[:], f64, b1)')
 def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized=False) -> np.ndarray:
     """
     Makes matrix of euclidean distances of each coordinate in coords_1 to each coordinate in coords_2
@@ -117,6 +124,7 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, norm
 
 
 @nb.njit
+@numba_cc.export('get_rmsd', '(f64[:], f64[:])')
 def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
     """
     RMSD of paired coordinates = normalized square-root of sum of squares of euclidean distances
@@ -125,6 +133,7 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
 
 
 @nb.njit
+@numba_cc.export('get_caretta_score', '(f64[:], f64[:], f64, b1)')
 def get_caretta_score(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized) -> float:
     """
     Get caretta score for a a set of paired coordinates

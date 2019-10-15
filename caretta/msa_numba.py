@@ -1,15 +1,15 @@
+import typing
+from dataclasses import dataclass, field
 from pathlib import Path
-from dataclasses import dataclass
 
 import numba as nb
 import numpy as np
 import prody as pd
 
+from caretta import feature_extraction
 from caretta import neighbor_joining as nj
 from caretta import psa_numba as psa
 from caretta import rmsd_calculations, helper
-from caretta.main import get_structures
-import pickle
 
 
 @nb.njit
@@ -117,33 +117,55 @@ def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap=0) -> n
     return mean_sec
 
 
+@dataclass(eq=False)
 class Structure:
-    def __init__(self, name, pdb_file, sequence, secondary, features, coords, add_column=True, consensus_weight=1.):
-        """
-        Makes a Structure object
+    name: str
+    pdb_file: typing.Union[str, Path, None]
+    sequence: typing.Union[str, None]
+    secondary: np.ndarray = field(repr=False)
+    features: typing.Union[np.ndarray, None] = field(repr=False)
+    coords: np.ndarray = field(repr=False)
 
-        Parameters
-        ----------
-        name
-        sequence
-        secondary
-        features
-            dict of features
-        coords
-            array of alpha carbon coordinates
-        add_column
-            adds a column for consensus weight if True
-        """
-        self.name = name
-        self.pdb_file = pdb_file
-        self.sequence = sequence
-        self.secondary = secondary
-        self.features = features
-        if add_column:
-            add = np.zeros((coords.shape[0], 1)) + consensus_weight
-            self.coords = np.hstack((coords, add))
-        else:
-            self.coords = coords
+    @classmethod
+    def from_pdb_file(cls, pdb_file: typing.Union[str, Path], dssp_dir="caretta_tmp",
+                      extract_all_features=True, force_overwrite=False):
+        pdb_name = helper.get_file_parts(pdb_file)[1]
+        pdb = pd.parsePDB(str(pdb_file))
+        alpha_indices = helper.get_alpha_indices(pdb)
+        sequence = pdb[alpha_indices].getSequence()
+        coordinates = pdb[alpha_indices].getCoords().astype(np.float64)
+        only_dssp = (not extract_all_features)
+        features = feature_extraction.get_features(str(pdb_file), str(dssp_dir), only_dssp=only_dssp, force_overwrite=force_overwrite)
+        return cls(pdb_name, pdb_file, sequence, helper.secondary_to_array(features["secondary"]), features, coordinates)
+
+
+# class Structure:
+#     def __init__(self, name, pdb_file, sequence, secondary, features, coords, add_column=True, consensus_weight=1.):
+#         """
+#         Makes a Structure object
+#
+#         Parameters
+#         ----------
+#         name
+#         sequence
+#         secondary
+#         features
+#             dict of features
+#         coords
+#             array of alpha carbon coordinates
+#         add_column
+#             adds a column for consensus weight if True
+#         """
+#         self.name = name
+#         self.pdb_file = pdb_file
+#         self.sequence = sequence
+#         self.secondary = secondary
+#         self.features = features
+#         if add_column:
+#             add = np.zeros((coords.shape[0], 1)) + consensus_weight
+#             self.coords = np.hstack((coords, add))
+#         else:
+#             self.coords = coords
 
 
 @dataclass
@@ -159,8 +181,25 @@ class StructureMultiple:
     """
     Class for multiple structure alignment
     """
-    def __init__(self, structures):
-        self.structures = structures
+
+    def __init__(self, pdb_files, dssp_dir, consensus_weight=1., num_threads=20, extract_all_features=True, force_overwrite=False):
+        pdbs = [pd.parsePDB(filename) for filename in pdb_files]
+        alpha_indices = [helper.get_alpha_indices(pdb) for pdb in pdbs]
+        sequences = [pdbs[i][alpha_indices[i]].getSequence() for i in range(len(pdbs))]
+        coordinates = [np.hstack((pdbs[i][alpha_indices[i]].getCoords().astype(np.float64), np.zeros((len(sequences[i]), 1)) + consensus_weight))
+                       for i in range(len(pdbs))]
+        only_dssp = (not extract_all_features)
+        features = feature_extraction.get_features_multiple(pdb_files, str(dssp_dir),
+                                                            num_threads=num_threads, only_dssp=only_dssp, force_overwrite=force_overwrite)
+        self.structures = []
+        for i in range(len(pdbs)):
+            pdb_name = helper.get_file_parts(pdb_files[i])[1]
+            self.structures.append(Structure(pdb_name,
+                                             pdb_files[i],
+                                             sequences[i],
+                                             helper.secondary_to_array(features[i]["secondary"]),
+                                             features[i],
+                                             coordinates[i]))
         self.lengths_array = np.array([len(s.sequence) for s in self.structures])
         self.max_length = np.max(self.lengths_array)
         self.coords_array = np.zeros((len(self.structures), self.max_length, self.structures[0].coords.shape[1]))
@@ -272,21 +311,20 @@ class StructureMultiple:
                 pickle.dump(msa_class, f)
         return msa_class
 
-    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, consensus_weight, pw_matrix=None) -> dict:
-
+    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
         print("Aligning...")
         if len(self.structures) == 2:
-            dtw_aln_1, dtw_aln_2, _ = psa.get_pairwise_alignment(self.coords_array[0, :self.lengths_array[0]],
-                                                                 self.coords_array[1, :self.lengths_array[1]],
-                                                                 self.secondary_array[0, :self.lengths_array[0]],
-                                                                 self.secondary_array[1, :self.lengths_array[1]],
-                                                                 gamma,
-                                                                 gap_open_sec=gap_open_sec,
-                                                                 gap_extend_sec=gap_extend_sec,
-                                                                 gap_open_penalty=gap_open_penalty,
-                                                                 gap_extend_penalty=gap_extend_penalty)
-            self.alignment = {self.structures[0].name: "".join([self.structures[0].sequence[i] if i != -1 else '-' for i in dtw_aln_1]),
-                              self.structures[1].name: "".join([self.structures[1].sequence[i] if i != -1 else '-' for i in dtw_aln_2])}
+            dtw_1, dtw_2, _ = psa.get_pairwise_alignment(self.coords_array[0, :self.lengths_array[0]],
+                                                         self.coords_array[1, :self.lengths_array[1]],
+                                                         self.secondary_array[0, :self.lengths_array[0]],
+                                                         self.secondary_array[1, :self.lengths_array[1]],
+                                                         gamma,
+                                                         gap_open_sec=gap_open_sec,
+                                                         gap_extend_sec=gap_extend_sec,
+                                                         gap_open_penalty=gap_open_penalty,
+                                                         gap_extend_penalty=gap_extend_penalty)
+            self.alignment = {self.structures[0].name: "".join([self.structures[0].sequence[i] if i != -1 else '-' for i in dtw_1]),
+                              self.structures[1].name: "".join([self.structures[1].sequence[i] if i != -1 else '-' for i in dtw_2])}
             return self.alignment
 
         if pw_matrix is None:
@@ -337,8 +375,7 @@ class StructureMultiple:
 
             mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2)
             mean_sec = get_mean_secondary(aln_sec_1, aln_sec_2, 0)
-            self.final_structures.append(Structure(name_int, None, None, mean_sec, None, mean_coords,
-                                                   add_column=False, consensus_weight=consensus_weight))
+            self.final_structures.append(Structure(name_int, None, None, mean_sec, None, mean_coords))
 
         for x in range(0, self.tree.shape[0] - 1, 2):
             node_1, node_2, node_int = self.tree[x, 0], self.tree[x + 1, 0], self.tree[x, 1]
