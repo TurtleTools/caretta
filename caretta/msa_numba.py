@@ -115,7 +115,7 @@ def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap=0) -> n
 
 
 class Structure:
-    def __init__(self, name, pdb_file, sequence, secondary, features, coords, add_column=True):
+    def __init__(self, name, pdb_file, sequence, secondary, features, coords, add_column=True, consensus_weight=1.):
         """
         Makes a Structure object
 
@@ -131,7 +131,6 @@ class Structure:
         add_column
             adds a column for consensus weight if True
         """
-        consensus_weight = 1.
         self.name = name
         self.pdb_file = pdb_file
         self.sequence = sequence
@@ -162,7 +161,7 @@ class StructureMultiple:
         self.branch_lengths = None
         self.alignment = None
 
-    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, pw_matrix=None) -> dict:
+    def align(self, gamma, gap_open_sec, gap_extend_sec, gap_open_penalty, gap_extend_penalty, consensus_weight, pw_matrix=None) -> dict:
 
         print("Aligning...")
         if len(self.structures) == 2:
@@ -227,7 +226,8 @@ class StructureMultiple:
 
             mean_coords = get_mean_coords_extra(aln_coords_1, aln_coords_2)
             mean_sec = get_mean_secondary(aln_sec_1, aln_sec_2, 0)
-            self.final_structures.append(Structure(name_int, None, None, mean_sec, None, mean_coords, add_column=False))
+            self.final_structures.append(Structure(name_int, None, None, mean_sec, None, mean_coords,
+                                                   add_column=False, consensus_weight=consensus_weight))
 
         for x in range(0, self.tree.shape[0] - 1, 2):
             node_1, node_2, node_int = self.tree[x, 0], self.tree[x + 1, 0], self.tree[x, 1]
