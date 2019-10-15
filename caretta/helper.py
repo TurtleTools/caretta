@@ -7,13 +7,9 @@ import numba as nb
 import numpy as np
 import prody as pd
 
-from setup import numba_cc
-
-
-# pd.confProDy(verbosity='none')
-
 
 @nb.njit
+# @numba_cc.export('nan_normalize', 'f64[:](f64[:])')
 def nan_normalize(numbers):
     minv, maxv = np.nanmin(numbers), np.nanmax(numbers)
     return (numbers - minv) / (maxv - minv)
@@ -47,6 +43,7 @@ def aligned_string_to_array(aln: str) -> np.ndarray:
 
 
 @nb.njit
+# @numba_cc.export('get_common_positions', '(i64[:], i64[:], i64)')
 def get_common_positions(aln_array_1, aln_array_2, gap=-1):
     """
     Return positions where neither alignment has a gap
@@ -67,6 +64,7 @@ def get_common_positions(aln_array_1, aln_array_2, gap=-1):
 
 
 @nb.njit
+# @numba_cc.export('get_aligned_data', '(i64[:], f64[:], i64)')
 def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
     """
     Fills coordinates according to an alignment
@@ -93,6 +91,7 @@ def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
 
 
 @nb.njit
+# @numba_cc.export('get_aligned_string_data', '(i64[:], i8[:], i64)')
 def get_aligned_string_data(aln_array, data, gap=-1):
     pos = np.array([i for i in range(len(aln_array)) if aln_array[i] != gap])
     assert len(pos) == data.shape[0]
