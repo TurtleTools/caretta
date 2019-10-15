@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numba as nb
 import numpy as np
 
