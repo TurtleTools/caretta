@@ -203,7 +203,7 @@ class StructureMultiple:
                        output_pdb_folder=Path("./result_pdb/"),
                        output_feature_filename=Path("./result_features.pkl"),
                        output_class_filename=Path("./result_class.pkl"),
-                       force=False):
+                       overwrite_dssp=False):
         pdb_files = parse_pdb_files(input_pdb)
         if not Path(dssp_dir).exists():
             Path(dssp_dir).mkdir()
@@ -215,7 +215,7 @@ class StructureMultiple:
         only_dssp = (not extract_all_features)
         print("Extracting features...")
         features = feature_extraction.get_features_multiple(pdb_files, str(dssp_dir),
-                                                            num_threads=num_threads, only_dssp=only_dssp, force_overwrite=force)
+                                                            num_threads=num_threads, only_dssp=only_dssp, force_overwrite=overwrite_dssp)
         structures = []
         for i in range(len(pdbs)):
             pdb_name = helper.get_file_parts(pdb_files[i])[1]
