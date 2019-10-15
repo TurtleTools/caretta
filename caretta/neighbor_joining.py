@@ -1,7 +1,8 @@
 import numba as nb
 import numpy as np
 
-from setup import numba_cc
+
+# from setup import numba_cc
 
 
 # Neighbor joining takes as input a distance matrix specifying the distance between each pair of taxa.
@@ -16,7 +17,7 @@ from setup import numba_cc
 
 
 @nb.njit
-@numba_cc.export('neighbor_joining', '(f64[:])')
+# @numba_cc.export('neighbor_joining', '(f64[:])')
 def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
     """
     Runs the neighbor joining algorithm on a distance matrix
@@ -91,7 +92,7 @@ def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
 
 # Q matrix calculation + minimum i, j (step 1 & 2)
 @nb.njit
-@numba_cc.export('_find_join_nodes', '(f64[:])')
+# @numba_cc.export('_find_join_nodes', '(f64[:])')
 def _find_join_nodes(distance_matrix):
     """
     Finds which nodes to join next
@@ -122,7 +123,7 @@ def _find_join_nodes(distance_matrix):
 
 # Branch length calculation (step 3)
 @nb.njit
-@numba_cc.export('_find_branch_length', '(f64[:], i64, i64)')
+# @numba_cc.export('_find_branch_length', '(f64[:], i64, i64)')
 def _find_branch_length(distance_matrix, i, j):
     """
     Finds branch lengths of old nodes to newly created node

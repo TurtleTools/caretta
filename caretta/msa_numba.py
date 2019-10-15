@@ -248,9 +248,9 @@ class StructureMultiple:
             Can be \n
             A list of PDB files
             A list of PDB IDs
-            A folder with input protein files \n
-            A file which lists PDB filenames on each line \n
-            A file which lists PDB IDs on each line \n
+            A folder with input protein files
+            A file which lists PDB filenames on each line
+            A file which lists PDB IDs on each line
         dssp_dir
             Folder to store temp DSSP files (default caretta_tmp)
         num_threads
@@ -273,7 +273,7 @@ class StructureMultiple:
         output_pdb_folder
             Folder to write superposed PDB files (default result_pdb)
         write_features
-            True => writes aligned features a s a dictionary of numpy arrays into a pickle file (default True)
+            True => writes aligned features as a dictionary of numpy arrays into a pickle file (default True)
         output_feature_filename
             Pickle file to write aligned features (default result_features.pkl)
         write_class

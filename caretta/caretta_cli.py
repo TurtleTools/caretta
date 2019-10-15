@@ -1,6 +1,6 @@
 import fire
 
-from caretta.msa_numba import StructureMultiple
+from caretta import msa_numba
 
 
 def align_cli(input_pdb,
@@ -53,14 +53,14 @@ def align_cli(input_pdb,
     overwrite_dssp
         Forces DSSP to rerun (default False)
     """
-    StructureMultiple.align_from_pdb_files(input_pdb,
-                                           dssp_dir, num_threads, extract_all_features,
-                                           gap_open_penalty, gap_extend_penalty, consensus_weight,
-                                           write_fasta, output_fasta_filename,
-                                           write_pdb, output_pdb_folder,
-                                           write_features, output_feature_filename,
-                                           write_class, output_class_filename,
-                                           overwrite_dssp)
+    msa_numba.StructureMultiple.align_from_pdb_files(input_pdb,
+                                                     dssp_dir, num_threads, extract_all_features,
+                                                     gap_open_penalty, gap_extend_penalty, consensus_weight,
+                                                     write_fasta, output_fasta_filename,
+                                                     write_pdb, output_pdb_folder,
+                                                     write_features, output_feature_filename,
+                                                     write_class, output_class_filename,
+                                                     overwrite_dssp)
 
 
 if __name__ == '__main__':
