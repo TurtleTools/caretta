@@ -157,7 +157,7 @@ class Structure:
     def from_pdb_file(cls, pdb_file: typing.Union[str, Path], dssp_dir="caretta_tmp",
                       extract_all_features=True, force_overwrite=False):
         pdb_name = helper.get_file_parts(pdb_file)[1]
-        pdb = pd.parsePDB(str(pdb_file))
+        pdb = pd.parsePDB(str(pdb_file)).select("protein")
         alpha_indices = helper.get_alpha_indices(pdb)
         sequence = pdb[alpha_indices].getSequence()
         coordinates = pdb[alpha_indices].getCoords().astype(np.float64)
