@@ -23,7 +23,7 @@ if not Path("static").exists():
 
 external_stylesheets = ["https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css"]
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets, url_base_pathname="/optiscan/")
 
 model_data = rq.get(
     'https://raw.githubusercontent.com/plotly/dash-bio-docs-files/master/' +
