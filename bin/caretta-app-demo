@@ -9,15 +9,13 @@ import dash
 import dash_bio as dashbio
 import dash_core_components as dcc
 import dash_html_components as html
+import fire
 import flask
 import numpy as np
-import requests as rq
+from cryptography.fernet import Fernet
 
 from caretta import helper
-# from caretta_pfam.pfam import PfamToPDB, PdbEntry, superimpose, get_pdbs_from_folder, run_chosen_entries
-from caretta.pfam import PfamToPDB, get_pdbs_from_folder
-import fire
-from cryptography.fernet import Fernet
+from caretta.pfam import PfamToPDB
 
 key = Fernet.generate_key()
 suite = Fernet(key)
@@ -25,52 +23,36 @@ suite = Fernet(key)
 if not Path("static").exists():
     Path("static").mkdir()
 
-
-
-
 external_stylesheets = ["https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css"]
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets, url_base_pathname="/caretta/")
 
-model_data = rq.get(
-    'https://raw.githubusercontent.com/plotly/dash-bio-docs-files/master/' +
-    'mol3d/model_data.js'
-).json()
-styles_data = rq.get(
-    'https://raw.githubusercontent.com/plotly/dash-bio-docs-files/master/' +
-    'mol3d/styles_data.js'
-).json()
 
-
-def heatmap(core_features, zeros=False):
+def feature_heatmap(data, zeros=False):
     if zeros:
         length = 2
         z = np.zeros((length, length))
-        data = [dict(z=z, type="heatmap", showscale=False)]
-        return {"data": data, "layout": {"margin": dict(l=25, r=25, t=25, b=25)}}
     else:
-        length = len(core_features[list(core_features.keys())[0]])
-        z = np.zeros((len(core_features), length))
-        for i in range(len(core_features)):
+        keys = list(data.keys())
+        length = len(data[keys[0]])
+        z = np.zeros((len(data), length))
+        for i in range(len(data)):
             for j in range(length):
-                z[i, j] = core_features[list(core_features.keys())[i]][j]
-        data = [dict(z=z, type="heatmap", showscale=False)]
-        return {"data": data, "layout": {"margin": dict(l=25, r=25, t=25, b=25)}}
+                z[i, j] = data[keys[i]][j]
+    return dict(data=[dict(z=z, type="heatmap", showscale=False)], layout=dict(margin=dict(l=25, r=25, t=25, b=25)))
 
 
-def feature_line(core_features, alignment):
-    length = len(core_features[list(core_features.keys())[0]])
-    z = np.zeros((len(core_features), length))
-    core_keys = list(core_features.keys())
-    for i in range(len(core_features)):
+def feature_line(features, alignment):
+    length = len(features[list(features.keys())[0]])
+    z = np.zeros((len(features), length))
+    keys = list(features.keys())
+    for i in range(len(features)):
         for j in range(length):
-            if alignment[core_keys[i]][j] is not "-":
-                z[i, j] = core_features[core_keys[i]][j]
+            if alignment[keys[i]][j] is not "-":
+                z[i, j] = features[keys[i]][j]
             else:
                 z[i, j] = np.NaN
-    print(z)
     y = np.array([np.nanmean(z[:, x]) for x in range(z.shape[1])])
-    y_med = np.array([np.nanmedian(z[:, x]) for x in range(z.shape[1])])
     y_se = np.array([np.nanstd(z[:, x]) / np.sqrt(z.shape[1]) for x in range(z.shape[1])])
 
     data = [dict(y=list(y + y_se) + list(y - y_se)[::-1], x=list(range(length)) + list(range(length))[::-1],
@@ -78,11 +60,10 @@ def feature_line(core_features, alignment):
                  line=dict(color='lightblue')),
             dict(y=y, x=np.arange(length), type="scatter", mode="lines", name="Mean",
                  line=dict(color='blue'))]
-    return {"data": data, "layout": {"legend": dict(x=.5, y=1.2),
-                                     "margin": dict(l=25, r=25, t=25, b=25)}}
+    return dict(data=data, layout=dict(legend=dict(x=0.5, y=1.2), margin=dict(l=25, r=25, t=25, b=25)))
 
 
-def scatter3D(coord_dict):
+def structure_plot(coord_dict):
     data = []
     for k, v in coord_dict.items():
         x, y, z = v[:, 0], v[:, 1], v[:, 2]
@@ -97,12 +78,11 @@ def scatter3D(coord_dict):
             line=dict(
                 width=3,
                 opacity=0.8)))
-    layout = {"margin": dict(l=20, r=20, t=20, b=20),
-              'clickmode': 'event+select',
-              'scene': {'xaxis': {"visible": False, "showgrid": False, "showline": False},
-                        "yaxis": {"visible": False, "showgrid": False, "showline": False},
-                        "zaxis": {"visible": False, "showgrid": False, "showline": False}}}
-    return {"data": data, "layout": layout}
+    layout = dict(margin=dict(l=20, r=20, t=20, b=20), clickmode='event+select',
+                  scene=dict(xaxis=dict(visible=False, showgrid=False, showline=False),
+                             yaxis=dict(visible=False, showgrid=False, showline=False),
+                             zaxis=dict(visible=False, showgrid=False, showline=False)))
+    return dict(data=data, layout=layout)
 
 
 def check_gap(sequences, i):
@@ -124,20 +104,16 @@ def get_feature_z(features, alignments):
 
 
 def write_as_csv(feature_dict, file_name):
-    f = open(file_name, "w")
-    print(feature_dict)
-    for protein_name, features in feature_dict.items():
-        f.write(";".join([protein_name] + [str(x) for x in list(features)]) + "\n")
-    f.close()
+    with open(file_name, "w") as f:
+        for protein_name, features in feature_dict.items():
+            f.write(";".join([protein_name] + [str(x) for x in list(features)]) + "\n")
 
 
 def write_as_csv_all_features(feature_dict, file_name):
-    f = open(file_name, "w")
-    print(feature_dict)
-    for protein_name, feature_dict in feature_dict.items():
-        for feature_name, feature_values in feature_dict.items():
-            f.write(";".join([protein_name, feature_name] + [str(x) for x in list(feature_values)]) + "\n")
-    f.close()
+    with open(file_name, "w") as f:
+        for protein_name, feature_dict in feature_dict.items():
+            for feature_name, feature_values in feature_dict.items():
+                f.write(";".join([protein_name, feature_name] + [str(x) for x in list(feature_values)]) + "\n")
 
 
 box_style = {"box-shadow": "1px 3px 20px -4px rgba(0,0,0,0.75)",
@@ -187,35 +163,34 @@ def aln_index_to_protein(alignment_index, alignment):
     return res
 
 
-pfam_start = PfamToPDB(from_file=False, limit=50)
+pfam_start = PfamToPDB(from_file=False, limit=100)
 pfam_start = list(pfam_start.pfam_to_pdb_ids.keys())
 pfam_start = [{"label": x, "value": x} for x in pfam_start]
 
-# app.layout = html.Div([
-#     dashbio.Molecule3dViewer(
-#         id='my-dashbio-molecule3d',
-#         modelData=shitty_model,
-#         styles=styles_data
-#     ),
-#     "Selection data",
-#     html.Hr(),
-#     html.Div(id='molecule3d-output')
-# ])
+introduction_text_web = """This is a demo webserver for Caretta. It generates multiple structure alignments for proteins from a selected 
+Pfam domain and displays the alignment, the superposed proteins, and aligned structural features. 
 
-intro = """This is a demo webserver for Caretta. It generates multiple structure alignments for proteins from a selected 
-Pfam domain and displays the alignment, the superposed proteins, and aligned structural features."""
+While the server is restricted to  a maximum of 50 proteins and 100 pfam domains, you can download this GUI and command-line tool from 
+https://git.wageningenur.nl/durai001/caretta and run it locally to use it on as many proteins as you'd like. 
 
-pfam_selection = """
-While the server is restricted to  a maximum of 50 proteins and 100 pfam domains, you can download this GUI from https://git.wageningenur.nl/durai001/caretta and run it locally to use
- it on as many proteins as you'd like. All the generated data can further be exported for downstream use.
+All the generated data can further be exported for downstream use."""
 
-Choose: Please select a Pfam ID and click on Load Structures. You can then use the dropdown box to select which PDB IDs to align.
+introduction_text = """Caretta generates multiple structure alignments for a set of input proteins and displays the alignment, the superposed proteins,
+and aligned structural features. All the generated data can further be exported for downstream use. 
+If you have to align more than 100 proteins please use the command-line tool instead (See https://git.wageningenur.nl/durai001/caretta for instructions)."""
 
-"""
+pfam_selection_text = """Choose a Pfam ID or select a custom folder and click on Load Structures. 
+Then use the dropdown box to select which PDB IDs/files to align."""
+pfam_selection_text_web = """Choose a Pfam ID and click on Load Structures. 
+Then use the dropdown box to select which PDB IDs to align."""
+structure_alignment_text = """Click on a residue to see its position on the feature alignment in the next section."""
+feature_alignment_text = """Click on a position in the feature alignment to see the corresponding residues in the previous section."""
 
-app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta - a multiple protein structure alignment and feature extraction tool",
+app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta",
                                                            style={"text-align": "center"}),
-                                                   html.P(intro, style={"text-align": "center"})], className="row"),
+                                                   html.H3("a multiple protein structure alignment and feature extraction suite",
+                                                           style={"text-align": "center"}),
+                                                   html.P(introduction_text_web, style={"text-align": "left"})], className="row"),
                                          className="container"),
                                 html.Div([html.Br(), html.P(children=compress_object(PfamToPDB(from_file=False,
                                                                                                limit=100)), id="pfam-class",
@@ -228,14 +203,15 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta - a multiple
                                                  style={"display": "none"}),
                                           html.P(children="", id="alignment-data",
                                                  style={"display": "none"}),
-                                          html.Div([html.H3("Choose Pfam and Structures", className="row", style={"text-align": "center"}),
-                                                    html.P(pfam_selection, className="row"),
+                                          html.Div([html.H3("Choose Structures", className="row", style={"text-align": "center"}),
+                                                    html.P(pfam_selection_text_web, className="row"),
                                                     html.Div([html.Div(dcc.Dropdown(placeholder="Choose Pfam ID",
                                                                                     options=pfam_start, id="pfam-ids"), className="four columns"),
                                                               html.Button("Load Structures", className="four columns", id="load-button"),
-                                                              html.Div(
-                                                                  dcc.Input(placeholder="Custom folder", value="", type="text", id="custom-folder"),
-                                                                  className="four columns")], className="row"),
+                                                              # html.Div(
+                                                              #     dcc.Input(placeholder="Custom folder", value="", type="text", id="custom-folder"),
+                                                              #     className="four columns")],
+                                                              ], className="row"),
                                                     html.Div([html.Div(dcc.Dropdown(placeholder="Gap open penalty (1.0)",
                                                                                     options=[{"label": np.round(x, decimals=2), "value": x} for x in
                                                                                              np.arange(0, 5, 0.1)],
@@ -248,15 +224,18 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta - a multiple
                                                                                     id="gap-extend"),
                                                                        className="four columns")], className="row"),
                                                     html.Br(),
-                                                    html.Div(html.Button("Align Pfam Structures", className="twelve columns", id="align"),
-                                                             className="row")],
+                                                    html.Div(html.Button("Align Structures", className="twelve columns", id="align"),
+                                                             className="row"),
+                                                    dcc.Loading(id="loading-1", children=[html.Div(id="output-1", style={"text-align": "center"})],
+                                                                type="default")
+                                                    ],
                                                    className="container"),
                                           html.Br()], className="container", style=box_style),
                                 html.Br(),
                                 html.Div(children=[html.Br(),
                                                    html.H3("Sequence alignment", className="row", style={"text-align": "center"}),
                                                    html.Div(
-                                                       html.P("Sequence alignment is shown according to the structural alignment.", className="row"),
+                                                       html.P("", className="row"),
                                                        className="container"),
                                                    html.Div([html.Button("Download alignment", className="row", id="alignment-download"),
                                                              html.Div(children="", className="row", id="fasta-download-link")],
@@ -266,19 +245,18 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta - a multiple
                                 html.Br(),
                                 html.Div([html.Br(),
                                           html.H3("Structural alignment", className="row", style={"text-align": "center"}),
-                                          html.Div(html.P(
-                                              "Selecting a residue on a structure will indicate its location on a chosen feature alignment in the next section",
-                                              className="row"), className="container"),
+                                          html.Div(html.P(structure_alignment_text,
+                                                          className="row"), className="container"),
                                           html.Div(html.Button("Download PDB", className="row", id="pdb", style={"align": "center"}),
                                                    className="container"),
-                                          html.Div(children=dcc.Graph(figure=heatmap([[0, 0], [0, 0]], zeros=True), id="scatter3d"),
+                                          html.Div(children=dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True), id="scatter3d"),
                                                    className="row", id="aligned-proteins"), html.Br()],
                                          className="container", style=box_style),
                                 html.Br(),
                                 html.Div(
                                     [html.Br(), html.Div([html.Div([html.H3("Feature alignment", className="row", style={"text-align": "center"}),
                                                                     html.P(
-                                                                        "Selecting a residue position on the feature alignment will highlight the corresponding residues in all structures in the above 3d plot.",
+                                                                        feature_alignment_text,
                                                                         className="row"),
                                                                     dcc.Dropdown(placeholder="Choose a feature", id="feature-selection",
                                                                                  className="six columns"),
@@ -290,10 +268,12 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta - a multiple
                                                                     html.Br()])], className="container"),
 
                                      html.Div(
-                                         html.Div(dcc.Graph(figure=heatmap([[0, 0], [0, 0]], zeros=True), id="feature-line"), id="feature-plot1"),
+                                         html.Div(dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True), id="feature-line"),
+                                                  id="feature-plot1"),
                                          className="row"),
-                                     html.Div(html.Div(dcc.Graph(figure=heatmap([[0, 0], [0, 0]], zeros=True), id="heatmap"), id="feature-plot2"),
-                                              className="row")],
+                                     html.Div(
+                                         html.Div(dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True), id="heatmap"), id="feature-plot2"),
+                                         className="row")],
                                     className="container", style=box_style),
                                 html.Br(), html.Br(), html.Div(id="testi")])
 
@@ -311,9 +291,8 @@ def download_alignment(clicked, data, pfam_data):
         fasta = pfam_class.to_fasta_str(alignment)
         fnum = np.random.randint(0, 1000000000)
         fname = f"static/{fnum}.fasta"
-        f = open(fname, "w")
-        f.write(fasta)
-        f.close()
+        with open(fname, "w") as f:
+            f.write(fasta)
         return html.A(f"Download %s here" % ("alignment" + ".fasta"), href="/%s" % fname)
     else:
         return ""
@@ -327,7 +306,6 @@ def show_selected_atoms(clicked, pfam_class, pfam_id):
     if clicked and pfam_class and pfam_id:
         pfam_class = decompress_object(pfam_class)
         pfam_structures = pfam_class.get_entries_for_pfam(pfam_id)
-        print(pfam_structures)
         return [{"label": x.PDB_ID, "value": compress_object(x)} for x in pfam_structures]
     # elif clicked and pfam_class and custom_folder:
     #     pdb_files = get_pdbs_from_folder(custom_folder)
@@ -337,7 +315,8 @@ def show_selected_atoms(clicked, pfam_class, pfam_id):
         return [{"label": "no selection", "value": "None"}]
 
 
-@app.callback([dash.dependencies.Output("alignment", "children"),
+@app.callback([dash.dependencies.Output("output-1", "children"),
+               dash.dependencies.Output("alignment", "children"),
                dash.dependencies.Output("aligned-proteins", "children"),
                dash.dependencies.Output("feature-data", "children"),
                dash.dependencies.Output("feature-selection", "options"),
@@ -351,23 +330,13 @@ def align_structures(clicked, pdb_entries, pfam_class, gap_open, gap_extend):
     if clicked and pdb_entries and pfam_class:
         pfam_class = decompress_object(pfam_class)
         pdb_entries = [decompress_object(x) for x in pdb_entries]
-        print("starting alignment")
         if gap_open and gap_extend:
             alignment, pdbs, features = pfam_class.multiple_structure_alignment_from_pfam(pdb_entries,
                                                                                           gap_open_penalty=gap_open,
                                                                                           gap_extend_penalty=gap_extend)
         else:
             alignment, pdbs, features = pfam_class.multiple_structure_alignment_from_pfam(pdb_entries)
-        # aln_np = {k: helper.aligned_string_to_array(alignment[k]) for k in alignment}
         pfam_class.msa.superpose(alignment)
-        # pdbs_sup = superimpose(pdbs, aln_np)
-        # names = list(pdbs_sup.keys())
-        # files = []
-
-        # for n in names:
-        #     files.append(f"test_{n}.pdb")
-        #     pd.writePDB(f"test_{n}.pdb", pdbs_sup[n])
-        print("ending alignment")
         fasta = pfam_class.to_fasta_str(alignment)
         component = dashbio.AlignmentChart(
             id='my-dashbio-alignmentchart',
@@ -375,10 +344,11 @@ def align_structures(clicked, pdb_entries, pfam_class, gap_open, gap_extend):
             overview=None, height=300,
             colorscale="hydrophobicity"
         )
-        return component, dcc.Graph(figure=scatter3D({s.name: s.coords for s in pfam_class.msa.structures}), id="scatter3d"), compress_object(
+        return "", component, dcc.Graph(figure=structure_plot({s.name: s.coords for s in pfam_class.msa.structures}),
+                                        id="scatter3d"), compress_object(
             features), [{"label": x, "value": x} for x in features[list(features.keys())[0]]], compress_object(alignment)
     else:
-        return "", "", compress_object(np.zeros(0)), [{"label": "no alignment present", "value": "no alignment"}], compress_object(np.zeros(0))
+        return "", "", "", compress_object(np.zeros(0)), [{"label": "no alignment present", "value": "no alignment"}], compress_object(np.zeros(0))
 
 
 @app.callback([dash.dependencies.Output("feature-plot1", "children"),
@@ -395,12 +365,12 @@ def display_feature(clicked, chosen_feature, feature_dict, aln):
         aln_np = {k: helper.aligned_string_to_array(alignment[k]) for k in alignment}
         chosen_feature_aln_dict = {x: helper.get_aligned_string_data(aln_np[x], chosen_feature_dict[x]) for x in feature_dict.keys()}
         z = get_feature_z(chosen_feature_aln_dict, alignment)
-        component1 = dcc.Graph(figure=heatmap(z), id="heatmap")
+        component1 = dcc.Graph(figure=feature_heatmap(z), id="heatmap")
         component2 = dcc.Graph(figure=feature_line(z, alignment), id="feature-line")
         return component2, component1
     else:
-        return dcc.Graph(figure=heatmap([[0, 0], [0, 0]], zeros=True),
-                         id="feature-line", style={"display": "none"}), dcc.Graph(figure=heatmap([[0, 0], [0, 0]], zeros=True),
+        return dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True),
+                         id="feature-line", style={"display": "none"}), dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True),
                                                                                   id="heatmap", style={"display": "none"})
 
 
@@ -438,7 +408,7 @@ def write_output(clicked, clicked_all, chosen_feature, feature_dict, aln):
 
 
 @app.server.route('/static/<path:path>')
-def downlad_file(path):
+def download_file(path):
     root_dir = os.getcwd()
     return flask.send_from_directory(
         os.path.join(root_dir, 'caretta/static'), path)
@@ -466,7 +436,6 @@ def update_features(clickdata_3d, clickdata_feature, feature_data, scatter3d_dat
         aln_positions = aln_index_to_protein(idx, alignment)
         button1 = compress_object((idx, protein_index))
         x, y = clickdata["points"][0]["x"], clickdata["points"][0]["y"]
-        # try
         try:
             maxim, minim = np.max(feature_data["data"][0]["y"]), np.min(feature_data["data"][0]["y"])
         except KeyError:
@@ -486,7 +455,6 @@ def update_features(clickdata_3d, clickdata_feature, feature_data, scatter3d_dat
                 x, y, z = d["x"][p], d["y"][p], d["z"][p]
                 to_add.append((x, y, z))
             else:
-                print("None")
                 continue
         scatter3d_data["data"] += [dict(x=[x[0] for x in to_add],
                                         y=[y[1] for y in to_add],
@@ -498,7 +466,6 @@ def update_features(clickdata_3d, clickdata_feature, feature_data, scatter3d_dat
         alignment = decompress_object(alignment_data)
         number_of_structures = len(alignment)
         clickdata = clickdata_3d
-        print(clickdata)
         idx = clickdata["points"][0]["pointNumber"]
         protein_index = clickdata["points"][0]["curveNumber"]
         button2 = compress_object((idx, protein_index))
@@ -511,7 +478,6 @@ def update_features(clickdata_3d, clickdata_feature, feature_data, scatter3d_dat
             return feature_data, scatter3d_data, button1, button2
         if len(feature_data["data"]) > 2:
             feature_data["data"] = feature_data["data"][:-1]
-        print(number_of_structures)
         feature_data["data"] += [dict(y=[minim, maxim], x=[aln_index, aln_index], type="scatter", mode="lines",
                                       name="selected_residue")]
         if len(scatter3d_data["data"]) > number_of_structures:
@@ -526,8 +492,8 @@ def update_features(clickdata_3d, clickdata_feature, feature_data, scatter3d_dat
 
 def run_server(host="0.0.0.0", port=8888):
     """
-    Carettapp is a web server of caretta, capable of aligning and visualising multiple protein structures
-    and allowing extraction of aligned features such as bond angles, depth and fluctuations.
+    caretta-app is the GUI of caretta, capable of aligning and visualising multiple protein structures
+    and allowing extraction of aligned features such as bond angles, residue depths and fluctuations.
     ----------
     host
         host ip (string)

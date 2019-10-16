@@ -18,6 +18,7 @@ class PdbEntry:
     PFAM_Name: str
     PFAM_desc: str
     eValue: float
+    PDB_file: str = None
 
     @classmethod
     def from_data_line(cls, data_line):
@@ -36,15 +37,18 @@ class PdbEntry:
 
     @classmethod
     def from_user_input(cls, pdb_path, chain_id="A"):
-        return cls(pdb_path, chain_id, -1, -1, "none", "none", "none", 0.0)
+        return cls(pdb_path, chain_id, -1, -1, "none", "none", "none", 0.0, pdb_path)
 
     def get_pdb(self, from_atm_file=None):
         if from_atm_file is not None:
             pdb_obj = pd.parsePDB(f"{from_atm_file}{(self.PDB_ID + self.CHAIN_ID).lower()}.atm")
         else:
-            if self.CHAIN_ID == "":
-                chain_id = 'A'
-            pdb_obj = pd.parsePDB(self.PDB_ID, chain=self.CHAIN_ID)  # TODO : change mkdir and etc..
+            if self.PDB_file is not None:
+                pdb_obj = pd.parsePDB(self.PDB_file)
+            else:
+                # if self.CHAIN_ID == "":
+                #     chain_id = 'A'
+                pdb_obj = pd.parsePDB(self.PDB_ID, chain=self.CHAIN_ID)  # TODO : change mkdir and etc..
             if self.PdbResNumStart == -1 and self.PdbResNumEnd == -1:
                 pdb_obj = pdb_obj.select(f"protein")
             else:
@@ -93,6 +97,8 @@ class PfamToPDB:
         data_lines = data_lines[1:]
         self.pfam_to_pdb_ids = dict()
         self._initiate_pfam_to_pdbids(data_lines, limit=limit)
+        self.msa = None
+        self.caretta_alignment = None
 
     def _initiate_pfam_to_pdbids(self, data_lines, limit=None):
         for line in data_lines:
@@ -121,31 +127,12 @@ class PfamToPDB:
     def multiple_structure_alignment_from_pfam(self, pdb_entries,
                                                gap_open_penalty=0.1,
                                                gap_extend_penalty=0.001):
-
         self.msa = PfamStructures.from_pdb_files([p.get_pdb()[1] for p in pdb_entries])
         self.caretta_alignment = self.msa.align(gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty)
-
-        # objs_features = [x.get_features() for x in pdb_entries]
-        # pdb_objects = [x[0] for x in objs_features]
-        # pdb_features = feature_extraction.get_features_multiple([x[1] for x in objs_features],
-        #                                                         "/mnt/local_scratch/akdel001/caretta_pfam/tmp/dssp_features/",
-        #                                                         num_threads=20, only_dssp=False)
-        # pdb_names = [x.unique_name for x in pdb_entries]
-        # alpha_indices = [helper.get_alpha_indices(pdb) for pdb in pdb_objects]
-        # coordinates = [pdb[alpha_indices[i]].getCoords().astype(np.float64) for i, pdb in enumerate(pdb_objects)]
-        # structures = [msa_numba.Structure(pdb_names[i],
-        #                                   pdb_objects[i][alpha_indices[i]].getSequence(),
-        #                                   helper.secondary_to_array(pdb_features[i]["secondary"]),
-        #                                   # pdb_features[i],
-        #                                   coordinates[i]) for i in range(len(pdb_names))]
-        # self.msa = msa_numba.StructureMultiple(structures)
-        # self.caretta_alignment = self.msa.align(gamma=0.03, gap_open_sec=1, gap_extend_sec=0.01,
-        #                                         gap_open_penalty=gap_open_penalty,
-        #                                         gap_extend_penalty=gap_extend_penalty)
         return self.caretta_alignment, {s.name: pd.parsePDB(s.pdb_file) for s in self.msa.structures}, {s.name: s.features for s in
                                                                                                         self.msa.structures}
 
-    def get_entries_for_pfam(self, pfam_id, limit_by_score=1., limit_by_protein_number=40, gross_limit=1000):
+    def get_entries_for_pfam(self, pfam_id, limit_by_score=1., limit_by_protein_number=50, gross_limit=1000):
         pdb_entries = list(filter(lambda x: (x.eValue < limit_by_score), self.pfam_to_pdb_ids[pfam_id]))[:limit_by_protein_number]
         return pdb_entries
 
@@ -169,15 +156,11 @@ class PfamStructures(msa_numba.StructureMultiple):
                  write_class=True, output_class_filename=Path("./result_class.pkl"),
                  overwrite_dssp=False):
         self.pdb_entries = pdb_entries
-        super(PfamStructures, self).from_pdb_files([p.get_pdb()[1] for p in self.pdb_entries], dssp_dir="caretta_tmp",
-                                                   num_threads=20, extract_all_features=True,
-                                                   consensus_weight=1.,
-                                                   output_fasta_filename=Path("./result.fasta"),
-                                                   output_pdb_folder=Path("./result_pdb/"),
-                                                   output_feature_filename=Path("./result_features.pkl"),
-                                                   output_class_filename=Path("./result_class.pkl"),
-                                                   overwrite_dssp=False)
-
-    def align_pfam(self, pdb_entries, gap_open_penalty=1., gap_extend_penalty=0.01):
-        self.align(gap_open_penalty, gap_extend_penalty)
-        return self.alignment, {s.name: pd.parsePDB(s.pdb_file) for s in self.structures}, {s.name: s.features for s in self.structures}
+        super(PfamStructures, self).from_pdb_files([p.get_pdb()[1] for p in self.pdb_entries], dssp_dir,
+                                                   num_threads, extract_all_features,
+                                                   consensus_weight,
+                                                   output_fasta_filename,
+                                                   output_pdb_folder,
+                                                   output_feature_filename,
+                                                   output_class_filename,
+                                                   overwrite_dssp)
