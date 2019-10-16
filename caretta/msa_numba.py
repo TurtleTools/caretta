@@ -45,6 +45,32 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
     return pairwise_matrix
 
 
+@nb.njit(parallel=True)
+def make_pairwise_rmsd_score_matrix(coords_array, secondary_array, lengths_array, gamma,
+                                   gap_open_penalty: float, gap_extend_penalty: float,
+                                   gap_open_sec, gap_extend_sec):
+    pairwise_matrix = np.zeros((coords_array.shape[0], coords_array.shape[0]))
+    for i in nb.prange(pairwise_matrix.shape[0] - 1):
+        for j in range(i + 1, pairwise_matrix.shape[1]):
+            dtw_aln_1, dtw_aln_2, score = psa.get_pairwise_alignment(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
+                                                                     secondary_array[i, :lengths_array[i]], secondary_array[j, :lengths_array[j]],
+                                                                     gamma,
+                                                                     gap_open_sec=gap_open_sec,
+                                                                     gap_extend_sec=gap_extend_sec,
+                                                                     gap_open_penalty=gap_open_penalty,
+                                                                     gap_extend_penalty=gap_extend_penalty)
+            common_coords_1, common_coords_2 = get_common_coordinates(coords_array[i, :lengths_array[i]],
+                                                                      coords_array[j, :lengths_array[j]],
+                                                                      dtw_aln_1, dtw_aln_2)
+            rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
+            common_coords_2[:, :3] = rmsd_calculations.apply_rotran(common_coords_2[:, :3], rotation_matrix, translation_matrix)
+            score = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2, gamma, True)
+            pairwise_matrix[i, j] = score
+    pairwise_matrix += pairwise_matrix.T
+    return pairwise_matrix
+
+
+
 @nb.njit
 def _get_alignment_data(coords_1, coords_2, secondary_1, secondary_2, gamma,
                         gap_open_sec, gap_extend_sec,
@@ -232,6 +258,14 @@ class StructureMultiple:
         msa_class = StructureMultiple.from_structures(structures, output_fasta_filename, output_pdb_folder, output_feature_filename,
                                                       output_class_filename)
         return msa_class
+
+    def get_pairwise_matrix(self, gap_open_penalty, gap_extend_penalty, gamma=0.03, gap_open_sec=1., gap_extend_sec=0.1):
+        return make_pairwise_rmsd_score_matrix(self.coords_array,
+                                                       self.secondary_array,
+                                                       self.lengths_array,
+                                                       gamma,
+                                                       gap_open_sec, gap_extend_sec,
+                                                       gap_open_penalty, gap_extend_penalty)
 
     @staticmethod
     def align_from_pdb_files(input_pdb,
@@ -532,3 +566,4 @@ class StructureMultiple:
             transformation = pd.Transformation(rotation_matrix, translation_matrix)
             pdb = pd.applyTransformation(transformation, pdb)
             pd.writePDB(str(output_pdb_folder / f"{name}.pdb"), pdb)
+
