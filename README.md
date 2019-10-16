@@ -11,6 +11,8 @@ pip install .
 export OMP_NUM_THREADS=1
 export NUMBA_NUM_THREADS=20 # change to required number of threads
 
-caretta input_pdb_folder
+cd bin
+chmod +x caretta_cli
+./caretta_cli input_pdb_folder
 # caretta -h for more options
 ```
