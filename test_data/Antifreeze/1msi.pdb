@@ -1,4 +1,4 @@
-REMARK AtomGroup 1msi
+REMARK Selection 'protein'
 ATOM      1  N   ALA B   0      12.921  10.334 -10.386  1.00 45.87            
 ATOM      2  CA  ALA B   0      13.784   9.215 -10.683  1.00 45.84            
 ATOM      3  C   ALA B   0      13.579   8.233  -9.530  1.00 45.36            

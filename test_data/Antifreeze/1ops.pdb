@@ -1,4 +1,4 @@
-REMARK AtomGroup 1ops
+REMARK Selection 'protein'
 ATOM      1  N   SER C   2      12.506   7.590  -2.974  1.00 20.19            
 ATOM      2  CA  SER C   2      11.928   7.547  -4.345  1.00 16.04            
 ATOM      3  C   SER C   2      11.089   6.279  -4.612  1.00 21.02            

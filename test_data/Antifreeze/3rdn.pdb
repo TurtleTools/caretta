@@ -1,4 +1,4 @@
-REMARK AtomGroup 3rdn
+REMARK Selection 'protein'
 ATOM      1  N   ASN A   1      11.016   8.624  -9.247  1.00  1.82            
 ATOM      2  CA  ASN A   1      12.400   8.907  -8.755  1.00  1.28            
 ATOM      3  C   ASN A   1      12.736   8.009  -7.556  1.00  1.11            
