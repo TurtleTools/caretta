@@ -1,4 +1,4 @@
-#! python3
+#!/usr/bin/env python
 
 import base64
 import os
@@ -206,7 +206,7 @@ intro = """This is a demo webserver for Caretta. It generates multiple structure
 Pfam domain and displays the alignment, the superposed proteins, and aligned structural features."""
 
 pfam_selection = """
-While the server is restricted to  a maximum of 50 proteins and 100 pfam domains, you can download this GUI from x and run it locally to use
+While the server is restricted to  a maximum of 50 proteins and 100 pfam domains, you can download this GUI from https://git.wageningenur.nl/durai001/caretta and run it locally to use
  it on as many proteins as you'd like. All the generated data can further be exported for downstream use.
 
 Choose: Please select a Pfam ID and click on Load Structures. You can then use the dropdown box to select which PDB IDs to align.
