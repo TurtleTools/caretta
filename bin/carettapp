@@ -17,9 +17,16 @@ from caretta import helper
 # from caretta_pfam.pfam import PfamToPDB, PdbEntry, superimpose, get_pdbs_from_folder, run_chosen_entries
 from caretta.pfam import PfamToPDB, get_pdbs_from_folder
 import fire
+from cryptography.fernet import Fernet
+
+key = Fernet.generate_key()
+suite = Fernet(key)
 
 if not Path("static").exists():
     Path("static").mkdir()
+
+
+
 
 external_stylesheets = ["https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css"]
 
@@ -151,13 +158,12 @@ box_style_lr = {"top-margin": 25,
                 "background-color": "#ffbaba"}
 
 
-
 def compress_object(raw_object):
-    return base64.b64encode(pickle.dumps(raw_object, protocol=4)).decode("utf-8")
+    return base64.b64encode(suite.encrypt(pickle.dumps(raw_object, protocol=4))).decode("utf-8")
 
 
 def decompress_object(compressed_object):
-    return pickle.loads(base64.b64decode(compressed_object))
+    return pickle.loads(suite.decrypt(base64.b64decode(compressed_object)))
 
 
 def protein_to_aln_index(protein_index, aln_seq):
