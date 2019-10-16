@@ -15,7 +15,7 @@ import numpy as np
 from cryptography.fernet import Fernet
 
 from caretta import helper
-from caretta.pfam import PfamToPDB, get_pdbs_from_folder
+from caretta.pfam import PfamToPDB
 
 key = Fernet.generate_key()
 suite = Fernet(key)
@@ -25,7 +25,7 @@ if not Path("static").exists():
 
 external_stylesheets = ["https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css"]
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets, url_base_pathname="/caretta/")
 
 
 def feature_heatmap(data, zeros=False):
@@ -167,10 +167,10 @@ pfam_start = PfamToPDB(from_file=False, limit=100)
 pfam_start = list(pfam_start.pfam_to_pdb_ids.keys())
 pfam_start = [{"label": x, "value": x} for x in pfam_start]
 
-introduction_text_web = """This is the demo web-server for caretta. It generates multiple structure alignments for proteins from a selected 
+introduction_text_web = """This is a demo webserver for Caretta. It generates multiple structure alignments for proteins from a selected 
 Pfam domain and displays the alignment, the superposed proteins, and aligned structural features. 
 
-While the server is restricted to  a maximum of 50 proteins and 100 pfam domains, you can download the GUI from 
+While the server is restricted to  a maximum of 50 proteins and 100 pfam domains, you can download this GUI and command-line tool from 
 https://git.wageningenur.nl/durai001/caretta and run it locally to use it on as many proteins as you'd like. 
 
 All the generated data can further be exported for downstream use."""
@@ -204,14 +204,14 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta",
                                           html.P(children="", id="alignment-data",
                                                  style={"display": "none"}),
                                           html.Div([html.H3("Choose Structures", className="row", style={"text-align": "center"}),
-                                                    html.P(pfam_selection_text, className="row"),
+                                                    html.P(pfam_selection_text_web, className="row"),
                                                     html.Div([html.Div(dcc.Dropdown(placeholder="Choose Pfam ID",
                                                                                     options=pfam_start, id="pfam-ids"), className="four columns"),
                                                               html.Button("Load Structures", className="four columns", id="load-button"),
-                                                              html.Div(
-                                                                  dcc.Input(placeholder="Custom folder", value="", type="text", id="custom-folder"),
-                                                                  className="four columns")]
-                                                             , className="row"),
+                                                              # html.Div(
+                                                              #     dcc.Input(placeholder="Custom folder", value="", type="text", id="custom-folder"),
+                                                              #     className="four columns")],
+                                                              ], className="row"),
                                                     html.Div([html.Div(dcc.Dropdown(placeholder="Gap open penalty (1.0)",
                                                                                     options=[{"label": np.round(x, decimals=2), "value": x} for x in
                                                                                              np.arange(0, 5, 0.1)],
@@ -301,16 +301,16 @@ def download_alignment(clicked, data, pfam_data):
 @app.callback(dash.dependencies.Output('structure-selection', 'options'),
               [dash.dependencies.Input('load-button', 'n_clicks')],
               [dash.dependencies.State("pfam-class", "children"),
-               dash.dependencies.State("pfam-ids", "value"),
-               dash.dependencies.State("custom-folder", "value")])
-def show_selected_atoms(clicked, pfam_class, pfam_id, custom_folder):
+               dash.dependencies.State("pfam-ids", "value")])
+def show_selected_atoms(clicked, pfam_class, pfam_id):
     if clicked and pfam_class and pfam_id:
         pfam_class = decompress_object(pfam_class)
         pfam_structures = pfam_class.get_entries_for_pfam(pfam_id)
         return [{"label": x.PDB_ID, "value": compress_object(x)} for x in pfam_structures]
-    elif clicked and pfam_class and custom_folder:
-        pdb_files = get_pdbs_from_folder(custom_folder)
-        return [{"label": x.PDB_ID.split("/")[-1], "value": compress_object(x)} for x in pdb_files]
+    # elif clicked and pfam_class and custom_folder:
+    #     pdb_files = get_pdbs_from_folder(custom_folder)
+    #     print(pdb_files)
+    #     return [{"label": x.PDB_ID.split("/")[-1], "value": compress_object(x)} for x in pdb_files]
     else:
         return [{"label": "no selection", "value": "None"}]
 
@@ -407,11 +407,11 @@ def write_output(clicked, clicked_all, chosen_feature, feature_dict, aln):
                     html.Button("Export all features", id="export-all")]
 
 
-@app.server.route('/static/<path:path>')
+@app.server.route('/caretta/static/<path:path>')
 def download_file(path):
     root_dir = os.getcwd()
     return flask.send_from_directory(
-        os.path.join(root_dir, 'static'), path)
+        os.path.join(root_dir, '/caretta/static'), path)
 
 
 @app.callback([dash.dependencies.Output("feature-line", "figure"),
