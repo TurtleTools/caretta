@@ -1,6 +1,6 @@
 # Caretta
 
-
+## Installation
 
 ```bash
 conda install -c salilab dssp
@@ -13,6 +13,18 @@ export NUMBA_NUM_THREADS=20 # change to required number of threads
 
 cd bin
 chmod +x caretta_cli
-./caretta_cli input_pdb_folder
+chmod +x carettaapp
+```
+
+## Command-line Usage
+
+```
+caretta_cli input_pdb_folder
 # caretta -h for more options
+```
+
+## Using Carettapp (web-app)
+
+```
+carettapp <host-ip> <port> 
 ```
