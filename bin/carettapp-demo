@@ -437,11 +437,11 @@ def write_output(clicked, clicked_all, chosen_feature, feature_dict, aln):
                     html.Button("Export all features", id="export-all")]
 
 
-@app.server.route('caretta/static/<path:path>')
+@app.server.route('static/<path:path>')
 def downlad_file(path):
     root_dir = os.getcwd()
     return flask.send_from_directory(
-        os.path.join(root_dir, 'static'), path)
+        os.path.join(root_dir, 'caretta/static'), path)
 
 
 @app.callback([dash.dependencies.Output("feature-line", "figure"),
