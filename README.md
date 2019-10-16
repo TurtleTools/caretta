@@ -21,17 +21,17 @@ git clone https://git.wur.nl/durai001/caretta.git
 cd caretta
 ```
 
-### Installing both the command-line interface and the web-application:
+### Install both the command-line interface and the web-application:
 ```bash
-pip install -e .[GUI]
+pip install -e ".[GUI]"
 cd bin
 chmod +x caretta-cli
 chmod +x caretta-app
 ```
 
-### Installing only the command-line interface:
+### Install only the command-line interface:
 ```bash
-pip install -e .
+pip install .
 cd bin
 chmod +x caretta-cli
 ```
@@ -47,7 +47,8 @@ export NUMBA_NUM_THREADS=20 # change to required number of threads
 ### Command-line Usage
 
 ```bash
-./caretta-cli ../test_data/Antifreeze  
+./caretta-cli input_pdb_folder
+# e.g. ./caretta-cli ../test_data/Antifreeze  
 # caretta-cli -h for more options
 ```
 
