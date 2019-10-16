@@ -18,13 +18,13 @@ chmod +x carettaapp
 
 ## Command-line Usage
 
-```
+```bash
 caretta_cli input_pdb_folder
 # caretta -h for more options
 ```
 
 ## Using Carettapp (web-app)
 
-```
+```bash
 carettapp <host-ip> <port> 
 ```
