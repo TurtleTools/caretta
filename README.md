@@ -12,14 +12,14 @@ export OMP_NUM_THREADS=1
 export NUMBA_NUM_THREADS=20 # change to required number of threads
 
 cd bin
-chmod +x caretta_cli
+chmod +x caretta-cli
 chmod +x carettaapp
 ```
 
 ## Command-line Usage
 
 ```bash
-caretta_cli input_pdb_folder
+caretta-cli input_pdb_folder
 # caretta -h for more options
 ```
 

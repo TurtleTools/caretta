@@ -181,7 +181,7 @@ def aln_index_to_protein(alignment_index, alignment):
     return res
 
 
-pfam_start = PfamToPDB(from_file=True, limit=50)
+pfam_start = PfamToPDB(from_file=False, limit=50)
 pfam_start = list(pfam_start.pfam_to_pdb_ids.keys())
 pfam_start = [{"label": x, "value": x} for x in pfam_start]
 
@@ -211,7 +211,7 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta - a multiple
                                                            style={"text-align": "center"}),
                                                    html.P(intro, style={"text-align": "center"})], className="row"),
                                          className="container"),
-                                html.Div([html.Br(), html.P(children=compress_object(PfamToPDB(from_file=True,
+                                html.Div([html.Br(), html.P(children=compress_object(PfamToPDB(from_file=False,
                                                                                                limit=100)), id="pfam-class",
                                                             style={"display": "none"}),
                                           html.P(children="", id="feature-data",
