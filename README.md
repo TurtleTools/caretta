@@ -47,13 +47,13 @@ export NUMBA_NUM_THREADS=20 # change to required number of threads
 ### Command-line Usage
 
 ```bash
-caretta-cli input_pdb_folder
-# caretta -h for more options
+./caretta-cli ../test_data/Antifreeze  
+# caretta-cli -h for more options
 ```
 
 ### Web-application Usage
 
 ```bash
-caretta-app <host-ip> <port> 
+./caretta-app <host-ip> <port> 
 # e.g. caretta-app localhost 8091
 ```
