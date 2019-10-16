@@ -48,7 +48,7 @@ export NUMBA_NUM_THREADS=20 # change to required number of threads
 
 ```bash
 ./caretta-cli input_pdb_folder
-# e.g. ./caretta-cli ../test_data/Antifreeze  
+# e.g. ./caretta-cli ../test_data  
 # caretta-cli -h for more options
 ```
 
