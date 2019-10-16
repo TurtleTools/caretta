@@ -167,13 +167,13 @@ pfam_start = PfamToPDB(from_file=False, limit=100)
 pfam_start = list(pfam_start.pfam_to_pdb_ids.keys())
 pfam_start = [{"label": x, "value": x} for x in pfam_start]
 
-introduction_text_web = dcc.Markdown("""* This is a demo webserver for *caretta*. It generates multiple structure alignments for proteins from a selected 
+introduction_text_web = dcc.Markdown("""This is a demo webserver for *caretta*. It generates multiple structure alignments for proteins from a selected 
 Pfam domain and displays the alignment, the superposed proteins, and aligned structural features. 
 
-* While the server is restricted to a maximum of 50 proteins and 100 Pfam domains, you can download this GUI and command-line tool from 
+While the server is restricted to a maximum of 50 proteins and 100 Pfam domains, you can download this GUI and command-line tool from 
 [the git repository](https://git.wageningenur.nl/durai001/caretta) and run it locally to use it on as many proteins as you'd like. 
 
-* All the generated data can further be exported for downstream use.""")
+All the generated data can further be exported for downstream use.""")
 
 pfam_selection_text_web = """Choose a Pfam ID and click on Load Structures. 
 Then use the dropdown box to select which PDB IDs to align."""
