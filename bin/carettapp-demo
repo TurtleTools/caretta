@@ -319,23 +319,22 @@ def download_alignment(clicked, data, pfam_data):
         return ""
 
 
-# @app.callback(dash.dependencies.Output('structure-selection', 'options'),
-#               [dash.dependencies.Input('load-button', 'n_clicks')],
-#               [dash.dependencies.State("pfam-class", "children"),
-#                dash.dependencies.State("pfam-ids", "value"),
-#                dash.dependencies.State("custom-folder", "value")])
-# def show_selected_atoms(clicked, pfam_class, pfam_id, custom_folder):
-#     if clicked and pfam_class and pfam_id:
-#         pfam_class = decompress_object(pfam_class)
-#         pfam_structures = pfam_class.get_entries_for_pfam(pfam_id)
-#         print(pfam_structures)
-#         return [{"label": x.PDB_ID, "value": compress_object(x)} for x in pfam_structures]
-#     elif clicked and pfam_class and custom_folder:
-#         pdb_files = get_pdbs_from_folder(custom_folder)
-#         print(pdb_files)
-#         return [{"label": x.PDB_ID.split("/")[-1], "value": compress_object(x)} for x in pdb_files]
-#     else:
-#         return [{"label": "no selection", "value": "None"}]
+@app.callback(dash.dependencies.Output('structure-selection', 'options'),
+              [dash.dependencies.Input('load-button', 'n_clicks')],
+              [dash.dependencies.State("pfam-class", "children"),
+               dash.dependencies.State("pfam-ids", "value")])
+def show_selected_atoms(clicked, pfam_class, pfam_id):
+    if clicked and pfam_class and pfam_id:
+        pfam_class = decompress_object(pfam_class)
+        pfam_structures = pfam_class.get_entries_for_pfam(pfam_id)
+        print(pfam_structures)
+        return [{"label": x.PDB_ID, "value": compress_object(x)} for x in pfam_structures]
+    # elif clicked and pfam_class and custom_folder:
+    #     pdb_files = get_pdbs_from_folder(custom_folder)
+    #     print(pdb_files)
+    #     return [{"label": x.PDB_ID.split("/")[-1], "value": compress_object(x)} for x in pdb_files]
+    else:
+        return [{"label": "no selection", "value": "None"}]
 
 
 @app.callback([dash.dependencies.Output("alignment", "children"),
