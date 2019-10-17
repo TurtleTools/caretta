@@ -174,7 +174,7 @@ class Structure:
         sequence = pdb[alpha_indices].getSequence()
         coordinates = pdb[alpha_indices].getCoords().astype(np.float64)
         only_dssp = (not extract_all_features)
-        features = feature_extraction.get_features(str(pdb_file), str(dssp_dir), only_dssp=only_dssp,
+        features = feature_extraction.get_features(str(Path(pdb_file)), str(dssp_dir), only_dssp=only_dssp,
                                                    force_overwrite=force_overwrite)
         return cls(pdb_name, pdb_file, sequence, helper.secondary_to_array(features["secondary"]), features,
                    coordinates)
