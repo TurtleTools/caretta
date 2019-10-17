@@ -24,16 +24,11 @@ cd caretta
 ### Install both the command-line interface and the web-application:
 ```bash
 pip install -e ".[GUI]"
-cd bin
-chmod +x caretta-cli
-chmod +x caretta-app
 ```
 
 ### Install only the command-line interface:
 ```bash
 pip install .
-cd bin
-chmod +x caretta-cli
 ```
 
 ### Environment variables:
@@ -47,14 +42,14 @@ export NUMBA_NUM_THREADS=20 # change to required number of threads
 ### Command-line Usage
 
 ```bash
-./caretta-cli input_pdb_folder
-# e.g. ./caretta-cli ../test_data  
+caretta-cli input_pdb_folder
+# e.g. caretta-cli test_data  
 # caretta-cli -h for more options
 ```
 
 ### Web-application Usage
 
 ```bash
-./caretta-app <host-ip> <port> 
+caretta-app <host-ip> <port> 
 # e.g. caretta-app localhost 8091
 ```
