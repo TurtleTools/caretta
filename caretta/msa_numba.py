@@ -183,8 +183,7 @@ def parse_pdb_files(input_pdb: str) -> typing.List[typing.Union[str, Path]]:
             with open(input_pdb) as f:
                 pdb_files = f.read().strip().split('\n')
         else:
-            print("Weird string")  # TODO throw error
-            return []
+            pdb_files = str(input_pdb).split('\n')
     else:
         pdb_files = list(input_pdb)
         if not Path(pdb_files[0]).is_file():

@@ -1,4 +1,3 @@
-import glob
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,15 +45,16 @@ class PdbEntry:
             if self.PDB_file is not None:
                 pdb_obj = pd.parsePDB(self.PDB_file)
             else:
-                # if self.CHAIN_ID == "":
-                #     chain_id = 'A'
                 pdb_obj = pd.parsePDB(self.PDB_ID, chain=self.CHAIN_ID)  # TODO : change mkdir and etc..
             if self.PdbResNumStart == -1 and self.PdbResNumEnd == -1:
                 pdb_obj = pdb_obj.select(f"protein")
             else:
                 pdb_obj = pdb_obj.select(f"protein and resnum {self.PdbResNumStart} : {self.PdbResNumEnd + 1}")
-        filename = f"{self.PDB_ID}_{self.CHAIN_ID}_{self.PdbResNumStart}.pdb"
-        pd.writePDB(filename, pdb_obj)
+        if self.PDB_file is None:
+            filename = f"{self.PDB_ID}_{self.CHAIN_ID}_{self.PdbResNumStart}.pdb"
+            pd.writePDB(filename, pdb_obj)
+        else:
+            filename = self.PDB_file
         return pd.parsePDB(filename), filename
 
     def get_features(self, from_file=None):
@@ -66,7 +66,10 @@ class PdbEntry:
 
     @property
     def filename(self):
-        return f"{self.PDB_ID}_{self.CHAIN_ID}_{self.PdbResNumStart}.pdb"
+        if self.PDB_file is None:
+            return f"{self.PDB_ID}_{self.CHAIN_ID}_{self.PdbResNumStart}.pdb"
+        else:
+            return self.PDB_file
 
     @property
     def unique_name(self):
@@ -74,10 +77,10 @@ class PdbEntry:
 
 
 def get_pdbs_from_folder(path):
-    file_names = glob.glob(f"{path}/*.pdb")
+    file_names = Path(path).glob("*.pdb")
     res = []
     for f in file_names:
-        res.append(PdbEntry.from_user_input(f))
+        res.append(PdbEntry.from_user_input(str(f)))
     return res
 
 
