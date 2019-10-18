@@ -117,7 +117,6 @@ def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, force_overwrite=T
     pdb_file = str(Path(dssp_dir) / f"{name}.pdb")
     pd.writePDB(pdb_file, protein)
     protein = pd.parsePDB(pdb_file)
-    print(type(protein))
     dssp_file = Path(dssp_dir) / f"{name}.dssp"
     if force_overwrite or not dssp_file.exists():
         dssp_file = pd.execDSSP(str(pdb_file), outputname=name, outputdir=str(dssp_dir))
