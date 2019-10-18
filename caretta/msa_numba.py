@@ -250,7 +250,7 @@ class StructureMultiple:
         pdb_files = parse_pdb_files(input_pdb)
         if not Path(dssp_dir).exists():
             Path(dssp_dir).mkdir()
-        pdbs = [pd.parsePDB(filename) for filename in pdb_files]
+        pdbs = [pd.parsePDB(filename).select("protein") for filename in pdb_files]
         alpha_indices = [helper.get_alpha_indices(pdb) for pdb in pdbs]
         sequences = [pdbs[i][alpha_indices[i]].getSequence() for i in range(len(pdbs))]
         coordinates = [np.hstack((pdbs[i][alpha_indices[i]].getCoords().astype(np.float64), np.zeros((len(sequences[i]), 1)) + consensus_weight))
