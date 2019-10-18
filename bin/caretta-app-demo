@@ -287,7 +287,7 @@ def download_alignment(clicked, data, pfam_data):
         fname = f"static/{fnum}.fasta"
         with open(fname, "w") as f:
             f.write(fasta)
-        return html.A(f"Download %s here" % ("alignment" + ".fasta"), href="/%s" % fname)
+        return html.A(f"Download %s here" % ("alignment" + ".fasta"), href="/caretta/%s" % fname)
     else:
         return ""
 
@@ -387,14 +387,14 @@ def write_output(clicked, clicked_all, chosen_feature, feature_dict, aln):
         fnum = np.random.randint(0, 1000000000)
         fname = f"static/{fnum}.csv"
         write_as_csv(z, fname)
-        return html.A(f"Download %s here" % (str(fnum) + ".csv"), href="/%s" % fname), [html.Button("Export feature", id="export"),
+        return html.A(f"Download %s here" % (str(fnum) + ".csv"), href="/caretta/%s" % fname), [html.Button("Export feature", id="export"),
                                                                                         html.Button("Export all features", id="export-all")]
     elif (clicked_all and feature_dict and aln) and not clicked:
         feature_dict = decompress_object(feature_dict)
         fnum = np.random.randint(0, 1000000000)
         fname = f"static/{fnum}.csv"
         write_as_csv_all_features(feature_dict, fname)
-        return html.A(f"Download %s here" % (str(fnum) + ".csv"), href="/%s" % fname), [html.Button("Export feature", id="export"),
+        return html.A(f"Download %s here" % (str(fnum) + ".csv"), href="/caretta/%s" % fname), [html.Button("Export feature", id="export"),
                                                                                         html.Button("Export all features", id="export-all")]
     else:
         return "", [html.Button("Export feature", id="export"),
