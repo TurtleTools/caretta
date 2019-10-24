@@ -366,7 +366,8 @@ def show_selected_atoms(clicked, pfam_class, pfam_id):
                dash.dependencies.Output("aligned-proteins", "children"),
                dash.dependencies.Output("feature-data", "children"),
                dash.dependencies.Output("feature-selection", "options"),
-               dash.dependencies.Output("alignment-data", "children")],
+               dash.dependencies.Output("alignment-data", "children"),
+               dash.dependencies.Output("pfam-class", "children")],
               [dash.dependencies.Input("align", "n_clicks")],
               [dash.dependencies.State("structure-selection", "value"),
                dash.dependencies.State("pfam-class", "children"),
@@ -393,10 +394,10 @@ def align_structures(clicked, pdb_entries, pfam_class, gap_open, gap_extend):
         return "", component, dcc.Graph(figure=structure_plot({s.name: s.coords for s in pfam_class.msa.structures}),
                                         id="scatter3d"), compress_object(
             features), [{"label": x, "value": x} for x in features[list(features.keys())[0]]], compress_object(
-            alignment)
+            alignment), compress_object(pfam_class)
     else:
         return "", "", "", compress_object(np.zeros(0)), [
-            {"label": "no alignment present", "value": "no alignment"}], compress_object(np.zeros(0))
+            {"label": "no alignment present", "value": "no alignment"}], pdb_entries, pfam_class
 
 
 @app.callback([dash.dependencies.Output("feature-plot1", "children"),
