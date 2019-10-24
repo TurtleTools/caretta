@@ -4,6 +4,7 @@ import base64
 import os
 import pickle
 from pathlib import Path
+from zipfile import ZipFile
 
 import dash
 import dash_bio as dashbio
@@ -191,6 +192,8 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta",
                                                  style={"display": "none"}),
                                           html.P(children="", id="alignment-data",
                                                  style={"display": "none"}),
+                                          html.P(children="", id="msa-class",
+                                                 style={"display": "none"}),
                                           html.Div([html.H3("Choose Structures", className="row", style={"text-align": "center"}),
                                                     html.P("Input PDB files and click on Load Structures.", className="row"),
                                                     html.Div([
@@ -233,7 +236,8 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta",
                                           html.H3("Structural alignment", className="row", style={"text-align": "center"}),
                                           html.Div(html.P(structure_alignment_text,
                                                           className="row"), className="container"),
-                                          html.Div(html.Button("Download PDB", className="row", id="pdb", style={"align": "center"}),
+                                          html.Div([html.Button("Download PDB", className="row", id="pdb-download", style={"align": "center"}),
+                                                    html.Div(children="", className="row", id="pdb-download-link")],
                                                    className="container"),
                                           html.Div(children=dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True), id="scatter3d"),
                                                    className="row", id="aligned-proteins"), html.Br()],
@@ -290,12 +294,34 @@ def download_alignment(clicked, data):
         return ""
 
 
+@app.callback(dash.dependencies.Output('pdb-download-link', 'children'),
+              [dash.dependencies.Input('pdb-download', 'n_clicks')],
+              [dash.dependencies.State("alignment-data", "children"),
+               dash.dependencies.State("msa_class", "children")])
+def download_pdb(clicked, msa_class):
+    if clicked and msa_class:
+        msa_class = decompress_object(msa_class)
+        if not msa_class:
+            return ""
+        fnum = np.random.randint(0, 1000000000)
+        msa_class.output_files.pdb_folder = Path(f"static/{fnum}_pdb")
+        msa_class.write_files(write_pdb=True, write_fasta=False, write_class=False, write_features=False)
+        fname = f"static/{fnum}_pdb.zip"
+        pdb_zip_file = ZipFile(fname, mode="w")
+        for pdb_file in Path(msa_class.output_files.pdb_folder).glob("*.pdb"):
+            pdb_zip_file.write(str(pdb_file))
+        return html.A(f"Download %s here" % ("pdbs" + ".zip"), href="/%s" % fname)
+    else:
+        return ""
+
+
 @app.callback([dash.dependencies.Output("output-1", "children"),
                dash.dependencies.Output("alignment", "children"),
                dash.dependencies.Output("aligned-proteins", "children"),
                dash.dependencies.Output("feature-data", "children"),
                dash.dependencies.Output("feature-selection", "options"),
-               dash.dependencies.Output("alignment-data", "children")],
+               dash.dependencies.Output("alignment-data", "children"),
+               dash.dependencies.Output("msa-class", "children")],
               [dash.dependencies.Input("align", "n_clicks")],
               [dash.dependencies.State("custom-folder", "value"),
                dash.dependencies.State("gap-open", "value"),
@@ -320,9 +346,10 @@ def align_structures(clicked, input_pdb, gap_open, gap_extend):
         features = {s.name: s.features for s in msa_class.structures}
         return "", component, dcc.Graph(figure=structure_plot({s.name: s.coords for s in msa_class.structures}),
                                         id="scatter3d"), compress_object(
-            features), [{"label": x, "value": x} for x in features[list(features.keys())[0]]], compress_object(alignment)
+            features), [{"label": x, "value": x} for x in features[list(features.keys())[0]]], compress_object(alignment), compress_object(msa_class)
     else:
-        return "", "", "", compress_object(np.zeros(0)), [{"label": "no alignment present", "value": "no alignment"}], compress_object(np.zeros(0))
+        return "", "", "", compress_object(np.zeros(0)), [{"label": "no alignment present", "value": "no alignment"}], compress_object(np.zeros(0)), \
+               compress_object(np.zeros(0))
 
 
 @app.callback([dash.dependencies.Output("feature-plot1", "children"),
