@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import base64
 import os
 import pickle
 from pathlib import Path
+from zipfile import ZipFile
 
 import dash
 import dash_bio as dashbio
@@ -182,12 +183,15 @@ feature_alignment_text = """Click on a position in the feature alignment to see 
 
 app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta",
                                                            style={"text-align": "center"}),
-                                                   html.H3("a multiple protein structure alignment and feature extraction suite",
-                                                           style={"text-align": "center"}),
-                                                   html.P(introduction_text_web, style={"text-align": "left"})], className="row"),
+                                                   html.H3(
+                                                       "a multiple protein structure alignment and feature extraction suite",
+                                                       style={"text-align": "center"}),
+                                                   html.P(introduction_text_web, style={"text-align": "left"})],
+                                                  className="row"),
                                          className="container"),
                                 html.Div([html.Br(), html.P(children=compress_object(PfamToPDB(from_file=False,
-                                                                                               limit=100)), id="pfam-class",
+                                                                                               limit=100)),
+                                                            id="pfam-class",
                                                             style={"display": "none"}),
                                           html.P(children="", id="feature-data",
                                                  style={"display": "none"}),
@@ -197,76 +201,102 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta",
                                                  style={"display": "none"}),
                                           html.P(children="", id="alignment-data",
                                                  style={"display": "none"}),
-                                          html.Div([html.H3("Choose Structures", className="row", style={"text-align": "center"}),
+                                          html.Div([html.H3("Choose Structures", className="row",
+                                                            style={"text-align": "center"}),
                                                     html.P(pfam_selection_text_web, className="row"),
                                                     html.Div([html.Div(dcc.Dropdown(placeholder="Choose Pfam ID",
-                                                                                    options=pfam_start, id="pfam-ids"), className="four columns"),
-                                                              html.Button("Load Structures", className="four columns", id="load-button"),
+                                                                                    options=pfam_start, id="pfam-ids"),
+                                                                       className="four columns"),
+                                                              html.Button("Load Structures", className="four columns",
+                                                                          id="load-button"),
                                                               # html.Div(
                                                               #     dcc.Input(placeholder="Custom folder", value="", type="text", id="custom-folder"),
                                                               #     className="four columns")],
                                                               ], className="row"),
-                                                    html.Div([html.Div(dcc.Dropdown(placeholder="Gap open penalty (1.0)",
-                                                                                    options=[{"label": np.round(x, decimals=2), "value": x} for x in
-                                                                                             np.arange(0, 5, 0.1)],
-                                                                                    id="gap-open"), className="four columns"),
-                                                              html.Div(dcc.Dropdown(multi=True, id="structure-selection"),
-                                                                       className="four columns"),
-                                                              html.Div(dcc.Dropdown(placeholder="Gap extend penalty (0.01)",
-                                                                                    options=[{"label": np.round(x, decimals=3), "value": x} for x in
-                                                                                             np.arange(0, 1, 0.002)],
-                                                                                    id="gap-extend"),
-                                                                       className="four columns")], className="row"),
+                                                    html.Div(
+                                                        [html.Div(dcc.Dropdown(placeholder="Gap open penalty (1.0)",
+                                                                               options=[
+                                                                                   {"label": np.round(x, decimals=2),
+                                                                                    "value": x} for x in
+                                                                                   np.arange(0, 5, 0.1)],
+                                                                               id="gap-open"),
+                                                                  className="four columns"),
+                                                         html.Div(dcc.Dropdown(multi=True, id="structure-selection"),
+                                                                  className="four columns"),
+                                                         html.Div(dcc.Dropdown(placeholder="Gap extend penalty (0.01)",
+                                                                               options=[
+                                                                                   {"label": np.round(x, decimals=3),
+                                                                                    "value": x} for x in
+                                                                                   np.arange(0, 1, 0.002)],
+                                                                               id="gap-extend"),
+                                                                  className="four columns")], className="row"),
                                                     html.Br(),
-                                                    html.Div(html.Button("Align Structures", className="twelve columns", id="align"),
+                                                    html.Div(html.Button("Align Structures", className="twelve columns",
+                                                                         id="align"),
                                                              className="row"),
-                                                    dcc.Loading(id="loading-1", children=[html.Div(id="output-1", style={"text-align": "center"})],
+                                                    dcc.Loading(id="loading-1", children=[
+                                                        html.Div(id="output-1", style={"text-align": "center"})],
                                                                 type="default")
                                                     ],
                                                    className="container"),
                                           html.Br()], className="container", style=box_style),
                                 html.Br(),
                                 html.Div(children=[html.Br(),
-                                                   html.H3("Sequence alignment", className="row", style={"text-align": "center"}),
+                                                   html.H3("Sequence alignment", className="row",
+                                                           style={"text-align": "center"}),
                                                    html.Div(
                                                        html.P("", className="row"),
                                                        className="container"),
-                                                   html.Div([html.Button("Download alignment", className="row", id="alignment-download"),
-                                                             html.Div(children="", className="row", id="fasta-download-link")],
+                                                   html.Div([html.Button("Download alignment", className="row",
+                                                                         id="alignment-download"),
+                                                             html.Div(children="", className="row",
+                                                                      id="fasta-download-link")],
                                                             className="container"),
-                                                   html.Div(html.P(id="alignment", className="twelve columns"), className="row")],
+                                                   html.Div(html.P(id="alignment", className="twelve columns"),
+                                                            className="row")],
                                          className="container", style=box_style),
                                 html.Br(),
                                 html.Div([html.Br(),
-                                          html.H3("Structural alignment", className="row", style={"text-align": "center"}),
+                                          html.H3("Structural alignment", className="row",
+                                                  style={"text-align": "center"}),
                                           html.Div(html.P(structure_alignment_text,
                                                           className="row"), className="container"),
-                                          html.Div(html.Button("Download PDB", className="row", id="pdb", style={"align": "center"}),
+                                          html.Div([html.Button("Download PDB", className="row", id="pdb",
+                                                                style={"align": "center"}),
+                                                    html.Div(children="", className="row",
+                                                             id="pdb-download-link")],
                                                    className="container"),
-                                          html.Div(children=dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True), id="scatter3d"),
-                                                   className="row", id="aligned-proteins"), html.Br()],
+                                          html.Div(
+                                              children=dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True),
+                                                                 id="scatter3d"),
+                                              className="row", id="aligned-proteins"), html.Br()],
                                          className="container", style=box_style),
                                 html.Br(),
                                 html.Div(
-                                    [html.Br(), html.Div([html.Div([html.H3("Feature alignment", className="row", style={"text-align": "center"}),
-                                                                    html.P(
-                                                                        feature_alignment_text,
-                                                                        className="row"),
-                                                                    dcc.Dropdown(placeholder="Choose a feature", id="feature-selection",
-                                                                                 className="six columns"),
-                                                                    html.Button("Display feature alignment", id="feature-button",
-                                                                                className="six columns")], className="row"),
-                                                          html.Div([html.Div([html.Button("Export feature", id="export"),
-                                                                              html.Button("Export all features", id="export-all")], id="exporter"),
-                                                                    html.Div(html.P(""), id="link-field"),
-                                                                    html.Br()])], className="container"),
+                                    [html.Br(), html.Div([html.Div(
+                                        [html.H3("Feature alignment", className="row", style={"text-align": "center"}),
+                                         html.P(
+                                             feature_alignment_text,
+                                             className="row"),
+                                         dcc.Dropdown(placeholder="Choose a feature", id="feature-selection",
+                                                      className="six columns"),
+                                         html.Button("Display feature alignment", id="feature-button",
+                                                     className="six columns")], className="row"),
+                                        html.Div(
+                                            [html.Div([html.Button("Export feature", id="export"),
+                                                       html.Button("Export all features",
+                                                                   id="export-all")], id="exporter"),
+                                             html.Div(html.P(""), id="link-field"),
+                                             html.Br()])], className="container"),
 
                                      html.Div(
-                                         html.Div(dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True), id="feature-line"),
+                                         html.Div(dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True),
+                                                            id="feature-line"),
                                                   id="feature-plot1"),
                                          className="row"),
                                      html.Div(
-                                         html.Div(dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True), id="heatmap"), id="feature-plot2"),
+                                         html.Div(dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True),
+                                                            id="heatmap"), id="feature-plot2"),
                                          className="row")],
                                     className="container", style=box_style),
                                 html.Br(), html.Br(), html.Div(id="testi")])
@@ -287,7 +317,29 @@ def download_alignment(clicked, data, pfam_data):
         fname = f"static/{fnum}.fasta"
         with open(fname, "w") as f:
             f.write(fasta)
-        return html.A(f"Download %s here" % ("alignment" + ".fasta"), href="/%s" % fname)
+        return html.A(f"Download %s here" % ("alignment" + ".fasta"), href="/caretta/%s" % fname)
+    else:
+        return ""
+
+
+@app.callback(dash.dependencies.Output('pdb-download-link', 'children'),
+              [dash.dependencies.Input('pdb', 'n_clicks')],
+              [dash.dependencies.State("alignment-data", "children"),
+               dash.dependencies.State("pfam-class", "children")])
+def download_pdb(clicked, data, pfam_data):
+    if clicked and data and pfam_data:
+        alignment = decompress_object(data)
+        if not alignment:
+            return ""
+        pfam_class = decompress_object(pfam_data)
+
+        fnum = np.random.randint(0, 1000000000)
+        pfam_class.msa.output_files.pdb_folder = f"static/{fnum}_pdb"
+        pfam_class.msa.write_files(write_pdb=True, write_fasta=False, write_class=False, write_features=False)
+        pdb_zip_file = ZipFile(f"static/{fnum}_pdb.zip", mode="w")
+        for pdb_file in Path(pfam_class.msa.output_files.pdb_folder).glob("*.pdb"):
+            pdb_zip_file.write(str(pdb_file))
+        return html.A(f"Download %s here" % ("pdbs" + ".zip"), href="/caretta/%s" % f"static/{fnum}_pdb.zip")
     else:
         return ""
 
@@ -340,9 +392,11 @@ def align_structures(clicked, pdb_entries, pfam_class, gap_open, gap_extend):
         )
         return "", component, dcc.Graph(figure=structure_plot({s.name: s.coords for s in pfam_class.msa.structures}),
                                         id="scatter3d"), compress_object(
-            features), [{"label": x, "value": x} for x in features[list(features.keys())[0]]], compress_object(alignment)
+            features), [{"label": x, "value": x} for x in features[list(features.keys())[0]]], compress_object(
+            alignment)
     else:
-        return "", "", "", compress_object(np.zeros(0)), [{"label": "no alignment present", "value": "no alignment"}], compress_object(np.zeros(0))
+        return "", "", "", compress_object(np.zeros(0)), [
+            {"label": "no alignment present", "value": "no alignment"}], compress_object(np.zeros(0))
 
 
 @app.callback([dash.dependencies.Output("feature-plot1", "children"),
@@ -357,15 +411,17 @@ def display_feature(clicked, chosen_feature, feature_dict, aln):
         feature_dict = decompress_object(feature_dict)
         chosen_feature_dict = {x: feature_dict[x][chosen_feature] for x in feature_dict}
         aln_np = {k: helper.aligned_string_to_array(alignment[k]) for k in alignment}
-        chosen_feature_aln_dict = {x: helper.get_aligned_string_data(aln_np[x], chosen_feature_dict[x]) for x in feature_dict.keys()}
+        chosen_feature_aln_dict = {x: helper.get_aligned_string_data(aln_np[x], chosen_feature_dict[x]) for x in
+                                   feature_dict.keys()}
         z = get_feature_z(chosen_feature_aln_dict, alignment)
         component1 = dcc.Graph(figure=feature_heatmap(z), id="heatmap")
         component2 = dcc.Graph(figure=feature_line(z, alignment), id="feature-line")
         return component2, component1
     else:
         return dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True),
-                         id="feature-line", style={"display": "none"}), dcc.Graph(figure=feature_heatmap([[0, 0], [0, 0]], zeros=True),
-                                                                                  id="heatmap", style={"display": "none"})
+                         id="feature-line", style={"display": "none"}), dcc.Graph(
+            figure=feature_heatmap([[0, 0], [0, 0]], zeros=True),
+            id="heatmap", style={"display": "none"})
 
 
 @app.callback([dash.dependencies.Output("link-field", "children"),
@@ -387,21 +443,23 @@ def write_output(clicked, clicked_all, chosen_feature, feature_dict, aln):
         fnum = np.random.randint(0, 1000000000)
         fname = f"static/{fnum}.csv"
         write_as_csv(z, fname)
-        return html.A(f"Download %s here" % (str(fnum) + ".csv"), href="/%s" % fname), [html.Button("Export feature", id="export"),
-                                                                                        html.Button("Export all features", id="export-all")]
+        return html.A(f"Download %s here" % (str(fnum) + ".csv"), href="/caretta/%s" % fname), [
+            html.Button("Export feature", id="export"),
+            html.Button("Export all features", id="export-all")]
     elif (clicked_all and feature_dict and aln) and not clicked:
         feature_dict = decompress_object(feature_dict)
         fnum = np.random.randint(0, 1000000000)
         fname = f"static/{fnum}.csv"
         write_as_csv_all_features(feature_dict, fname)
-        return html.A(f"Download %s here" % (str(fnum) + ".csv"), href="/%s" % fname), [html.Button("Export feature", id="export"),
-                                                                                        html.Button("Export all features", id="export-all")]
+        return html.A(f"Download %s here" % (str(fnum) + ".csv"), href="/caretta/%s" % fname), [
+            html.Button("Export feature", id="export"),
+            html.Button("Export all features", id="export-all")]
     else:
         return "", [html.Button("Export feature", id="export"),
                     html.Button("Export all features", id="export-all")]
 
 
-@app.server.route('/static/<path:path>')
+@app.server.route('/caretta/static/<path:path>')
 def download_file(path):
     root_dir = os.getcwd()
     return flask.send_from_directory(

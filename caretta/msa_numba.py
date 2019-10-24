@@ -3,7 +3,6 @@ import typing
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numba as nb
 import numpy as np
 import prody as pd
@@ -166,6 +165,20 @@ class Structure:
         features = feature_extraction.get_features(str(pdb_file), str(dssp_dir), only_dssp=only_dssp, force_overwrite=force_overwrite)
         return cls(pdb_name, pdb_file, sequence, helper.secondary_to_array(features["secondary"]), features, coordinates)
 
+    @classmethod
+    def from_pdb_id(cls, pdb_name: str, chain: str, dssp_dir="caretta_tmp",
+                    extract_all_features=True, force_overwrite=False):
+        pdb = pd.parsePDB(pdb_name).select("protein").select(f"chain {chain}")
+        pdb_file = pd.writePDB(pdb_name, pdb)
+        alpha_indices = helper.get_alpha_indices(pdb)
+        sequence = pdb[alpha_indices].getSequence()
+        coordinates = pdb[alpha_indices].getCoords().astype(np.float64)
+        only_dssp = (not extract_all_features)
+        features = feature_extraction.get_features(str(Path(pdb_file)), str(dssp_dir), only_dssp=only_dssp,
+                                                   force_overwrite=force_overwrite)
+        return cls(pdb_name, pdb_file, sequence, helper.secondary_to_array(features["secondary"]), features,
+                   coordinates)
+
 
 @dataclass
 class OutputFiles:
@@ -237,7 +250,7 @@ class StructureMultiple:
         pdb_files = parse_pdb_files(input_pdb)
         if not Path(dssp_dir).exists():
             Path(dssp_dir).mkdir()
-        pdbs = [pd.parsePDB(filename) for filename in pdb_files]
+        pdbs = [pd.parsePDB(filename).select("protein") for filename in pdb_files]
         alpha_indices = [helper.get_alpha_indices(pdb) for pdb in pdbs]
         sequences = [pdbs[i][alpha_indices[i]].getSequence() for i in range(len(pdbs))]
         coordinates = [np.hstack((pdbs[i][alpha_indices[i]].getCoords().astype(np.float64), np.zeros((len(sequences[i]), 1)) + consensus_weight))
@@ -548,33 +561,22 @@ class StructureMultiple:
         if not output_pdb_folder.exists():
             output_pdb_folder.mkdir()
         reference_name = self.structures[0].name
-        reference_pdb = pd.parsePDB(str(self.structures[0].pdb_file))
+        reference_pdb = pd.parsePDB(self.structures[0].pdb_file)
         core_indices = np.array([i for i in range(len(alignments[reference_name])) if '-' not in [alignments[n][i] for n in alignments]])
         aln_ref = helper.aligned_string_to_array(alignments[reference_name])
         ref_coords_core = reference_pdb[helper.get_alpha_indices(reference_pdb)].getCoords().astype(np.float64)[
             np.array([aln_ref[c] for c in core_indices])]
         ref_centroid = rmsd_calculations.nb_mean_axis_0(ref_coords_core)
         ref_coords_core -= ref_centroid
-
         transformation = pd.Transformation(np.eye(3), -ref_centroid)
         reference_pdb = pd.applyTransformation(transformation, reference_pdb)
-        # reference_pdb.setCoords(reference_pdb.getCoords().astype(np.float64) - ref_centroid)
         pd.writePDB(str(output_pdb_folder / f"{reference_name}.pdb"), reference_pdb)
-
-        pdb_ref_2 = pd.parsePDB(str(output_pdb_folder / f"{reference_name}.pdb"))
-        plt.scatter(pdb_ref_2.getCoords()[:, 0], pdb_ref_2.getCoords()[:, 1], alpha=0.3)
-        # plt.show()
         for i in range(1, len(self.structures)):
             name = self.structures[i].name
-            pdb = pd.parsePDB(str(self.structures[i].pdb_file))
+            pdb = pd.parsePDB(self.structures[i].pdb_file)
             aln_name = helper.aligned_string_to_array(alignments[name])
             common_coords_2 = pdb[helper.get_alpha_indices(pdb)].getCoords().astype(np.float64)[np.array([aln_name[c] for c in core_indices])]
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(ref_coords_core, common_coords_2)
-            # coords = rmsd_calculations.apply_rotran(pdb.getCoords().astype(np.float64), rotation_matrix, translation_matrix)
-            # pdb.setCoords(coords)
             transformation = pd.Transformation(rotation_matrix.T, translation_matrix)
             pdb = pd.applyTransformation(transformation, pdb)
             pd.writePDB(str(output_pdb_folder / f"{name}.pdb"), pdb)
-            pdb_2 = pd.parsePDB(str(output_pdb_folder / f"{name}.pdb"))
-            plt.scatter(pdb_2.getCoords()[:, 0], pdb_2.getCoords()[:, 1], alpha=0.3)
-            # plt.show()
