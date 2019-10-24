@@ -567,6 +567,7 @@ class StructureMultiple:
         ref_coords_core = reference_pdb[helper.get_alpha_indices(reference_pdb)].getCoords().astype(np.float64)[
             np.array([aln_ref[c] for c in core_indices])]
         ref_centroid = rmsd_calculations.nb_mean_axis_0(ref_coords_core)
+        ref_coords_core -= ref_centroid
         transformation = pd.Transformation(np.eye(3), -ref_centroid)
         reference_pdb = pd.applyTransformation(transformation, reference_pdb)
         pd.writePDB(str(output_pdb_folder / f"{reference_name}.pdb"), reference_pdb)
@@ -576,7 +577,7 @@ class StructureMultiple:
             aln_name = helper.aligned_string_to_array(alignments[name])
             common_coords_2 = pdb[helper.get_alpha_indices(pdb)].getCoords().astype(np.float64)[np.array([aln_name[c] for c in core_indices])]
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(ref_coords_core, common_coords_2)
-            transformation = pd.Transformation(rotation_matrix, translation_matrix)
+            transformation = pd.Transformation(rotation_matrix.T, translation_matrix)
             pdb = pd.applyTransformation(transformation, pdb)
             pd.writePDB(str(output_pdb_folder / f"{name}.pdb"), pdb)
 
