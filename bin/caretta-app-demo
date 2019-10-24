@@ -334,7 +334,7 @@ def download_pdb(clicked, data, pfam_data):
         pfam_class = decompress_object(pfam_data)
 
         fnum = np.random.randint(0, 1000000000)
-        pfam_class.msa.output_files.pdb_folder = f"static/{fnum}_pdb"
+        pfam_class.msa.output_files.pdb_folder = Path(f"static/{fnum}_pdb")
         pfam_class.msa.write_files(write_pdb=True, write_fasta=False, write_class=False, write_features=False)
         pdb_zip_file = ZipFile(f"static/{fnum}_pdb.zip", mode="w")
         for pdb_file in Path(pfam_class.msa.output_files.pdb_folder).glob("*.pdb"):
