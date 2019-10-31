@@ -328,7 +328,7 @@ def download_pdb(clicked, msa_class):
                dash.dependencies.State("gap-extend", "value")])
 def align_structures(clicked, input_pdb, gap_open, gap_extend):
     if clicked and input_pdb:
-        pdb_entries = [PdbEntry.from_user_input(f) for f in msa_numba.parse_pdb_files(input_pdb)]
+        pdb_entries = [PdbEntry.from_user_input(f) for f in msa_numba.parse_pdb_files(input_pdb, "static/cleaned_pdb")]
         if not gap_open:
             gap_open = 1
         if not gap_extend:

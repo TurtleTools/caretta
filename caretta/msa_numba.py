@@ -70,7 +70,6 @@ def make_pairwise_rmsd_score_matrix(coords_array, secondary_array, lengths_array
     return pairwise_matrix
 
 
-
 @nb.njit
 def _get_alignment_data(coords_1, coords_2, secondary_1, secondary_2, gamma,
                         gap_open_sec, gap_extend_sec,
@@ -158,6 +157,7 @@ class Structure:
                       extract_all_features=True, force_overwrite=False):
         pdb_name = helper.get_file_parts(pdb_file)[1]
         pdb = pd.parsePDB(str(pdb_file)).select("protein")
+
         alpha_indices = helper.get_alpha_indices(pdb)
         sequence = pdb[alpha_indices].getSequence()
         coordinates = pdb[alpha_indices].getCoords().astype(np.float64)
@@ -184,11 +184,14 @@ class Structure:
 class OutputFiles:
     fasta_file: Path = Path("./result.fasta")
     pdb_folder: Path = Path("./result_pdb/")
+    cleaned_pdb_folder: Path = Path("./cleaned_pdb")
     feature_file: Path = Path("./result_features.pkl")
     class_file: Path = Path("./result_class.pkl")
 
 
-def parse_pdb_files(input_pdb: str) -> typing.List[typing.Union[str, Path]]:
+def parse_pdb_files(input_pdb: str, output_pdb="./cleaned_pdb") -> typing.List[typing.Union[str, Path]]:
+    if not Path(output_pdb).exists():
+        Path(output_pdb).mkdir()
     if type(input_pdb) == str:
         input_pdb = Path(input_pdb)
         if input_pdb.is_dir():
@@ -202,8 +205,17 @@ def parse_pdb_files(input_pdb: str) -> typing.List[typing.Union[str, Path]]:
         pdb_files = list(input_pdb)
         if not Path(pdb_files[0]).is_file():
             pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
-    print(f"Found {len(pdb_files)} PDB files")
-    return pdb_files
+    output_pdb_files = []
+    for pdb_file in pdb_files:
+        pdb = pd.parsePDB(pdb_file).select("protein")
+        chains = pdb.getChids()
+        if len(chains):
+            pdb = pdb.select(f"chain {chains[0]}")
+        output_pdb_file = str(Path(output_pdb) / f"{helper.get_file_parts(pdb_file)[1]}.pdb")
+        pd.writePDB(output_pdb_file, pdb)
+        output_pdb_files.append(output_pdb_file)
+    print(f"Found {len(output_pdb_files)} PDB files")
+    return output_pdb_files
 
 
 @dataclass
@@ -235,7 +247,10 @@ class StructureMultiple:
         for i in range(len(structures)):
             coords_array[i, :lengths_array[i]] = structures[i].coords
             secondary_array[i, :lengths_array[i]] = structures[i].secondary
-        output_files = OutputFiles(output_fasta_filename, output_pdb_folder, output_feature_filename, output_class_filename)
+        cleaned_pdb_folder = Path(helper.get_file_parts(output_pdb_folder)[1]) / "cleaned_pdb"
+        if not cleaned_pdb_folder.exists():
+            cleaned_pdb_folder.mkdir()
+        output_files = OutputFiles(output_fasta_filename, output_pdb_folder, cleaned_pdb_folder, output_feature_filename, output_class_filename)
         return cls(structures, lengths_array, max_length, coords_array, secondary_array, output_files=output_files)
 
     @classmethod
@@ -247,7 +262,10 @@ class StructureMultiple:
                        output_feature_filename=Path("./result_features.pkl"),
                        output_class_filename=Path("./result_class.pkl"),
                        overwrite_dssp=False):
-        pdb_files = parse_pdb_files(input_pdb)
+        cleaned_pdb_folder = Path(helper.get_file_parts(output_pdb_folder)[0]) / "cleaned_pdb"
+        if not cleaned_pdb_folder.exists():
+            cleaned_pdb_folder.mkdir()
+        pdb_files = parse_pdb_files(input_pdb, cleaned_pdb_folder)
         if not Path(dssp_dir).exists():
             Path(dssp_dir).mkdir()
         pdbs = [pd.parsePDB(filename).select("protein") for filename in pdb_files]
