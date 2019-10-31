@@ -297,7 +297,7 @@ def download_alignment(clicked, data):
 @app.callback(dash.dependencies.Output('pdb-download-link', 'children'),
               [dash.dependencies.Input('pdb-download', 'n_clicks')],
               [dash.dependencies.State("alignment-data", "children"),
-               dash.dependencies.State("msa_class", "children")])
+               dash.dependencies.State("msa-class", "children")])
 def download_pdb(clicked, msa_class):
     if clicked and msa_class:
         msa_class = decompress_object(msa_class)
