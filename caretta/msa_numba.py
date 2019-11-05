@@ -210,7 +210,7 @@ def parse_pdb_files(input_pdb: str, output_pdb: typing.Union[str, Path] = "./cle
     for pdb_file in pdb_files:
         pdb = pd.parsePDB(pdb_file).select("protein")
         chains = pdb.getChids()
-        if len(chains):
+        if len(chains) and len(chains[0].strip()):
             pdb = pdb.select(f"chain {chains[0]}")
         output_pdb_file = str(Path(output_pdb) / f"{helper.get_file_parts(pdb_file)[1]}.pdb")
         pd.writePDB(output_pdb_file, pdb)
