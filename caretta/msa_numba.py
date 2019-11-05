@@ -189,7 +189,8 @@ class OutputFiles:
     class_file: Path = Path("./result_class.pkl")
 
 
-def parse_pdb_files(input_pdb: str, output_pdb="./cleaned_pdb") -> typing.List[typing.Union[str, Path]]:
+def parse_pdb_files(input_pdb: str, output_pdb: typing.Union[str, Path] = "./cleaned_pdb") -> typing.List[
+    typing.Union[str, Path]]:
     if not Path(output_pdb).exists():
         Path(output_pdb).mkdir()
     if type(input_pdb) == str:
@@ -264,6 +265,8 @@ class StructureMultiple:
                        output_feature_filename=Path("./result_features.pkl"),
                        output_class_filename=Path("./result_class.pkl"),
                        overwrite_dssp=False):
+        if not Path(output_pdb_folder).exists():
+            Path(output_pdb_folder).mkdir()
         cleaned_pdb_folder = Path(helper.get_file_parts(output_pdb_folder)[0]) / "cleaned_pdb"
         if not cleaned_pdb_folder.exists():
             cleaned_pdb_folder.mkdir()
