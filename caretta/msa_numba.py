@@ -247,6 +247,8 @@ class StructureMultiple:
         for i in range(len(structures)):
             coords_array[i, :lengths_array[i]] = structures[i].coords
             secondary_array[i, :lengths_array[i]] = structures[i].secondary
+        if not Path(output_pdb_folder).exists():
+            Path(output_pdb_folder).mkdir()
         cleaned_pdb_folder = Path(helper.get_file_parts(output_pdb_folder)[1]) / "cleaned_pdb"
         if not cleaned_pdb_folder.exists():
             cleaned_pdb_folder.mkdir()
