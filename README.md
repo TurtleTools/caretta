@@ -9,9 +9,9 @@ The command-line tool and self-hosted web application do not have this restricti
 
 ### Requirements
 #### Operating system support
-1. Linux and Mac
+##### Linux and Mac
 All capabilities are supported
-2. Windows
+##### Windows
 The external tool **msms** is not available in Windows. Due to this:
     * Feature extraction is not available.
     * `extract-all-features` argument in caretta-cli should be always False. 
