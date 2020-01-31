@@ -573,7 +573,7 @@ def update_features(clickdata_3d, clickdata_feature, feature_data, scatter3d_dat
         return feature_data, scatter3d_data, button1, button2
 
 
-def run_server(host="0.0.0.0", port=8800):
+def run_server(host="0.0.0.0", port=3003):
     """
     caretta-app is the GUI of caretta, capable of aligning and visualising multiple protein structures
     and allowing extraction of aligned features such as bond angles, residue depths and fluctuations.
