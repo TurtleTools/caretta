@@ -184,7 +184,7 @@ regions which correlate with a given property.
 All the generated data can further be exported for downstream use.""")
 
 pfam_selection_text_web = """Choose a Pfam ID and click on Load Structures. 
-Then use the dropdown box to select which PDB IDs to align."""
+Then use the dropdown box to select which PDB IDs to align. The PDB IDs also include the chain ID and the residue range which is extracted, corresponding to the pfam domain."""
 structure_alignment_text = """Click on a residue to see its position on the feature alignment in the next section."""
 feature_alignment_text = """Click on a position in the feature alignment to see the corresponding residues in the previous section."""
 
@@ -361,7 +361,8 @@ def show_selected_atoms(clicked, pfam_class, pfam_id):
     if clicked and pfam_class and pfam_id:
         pfam_class = decompress_object(pfam_class)
         pfam_structures = pfam_class.get_entries_for_pfam(pfam_id)
-        return [{"label": f"{x.PDB_ID}.{x.CHAIN_ID}", "value": compress_object(x)} for x in pfam_structures]
+        return [{"label": f"{x.PDB_ID}.{x.CHAIN_ID} ({x.PdbResNumStart}-{x.PdbResNumEnd})", "value": compress_object(x)}
+                for x in pfam_structures]  # TODO: test if working
     else:
         return [{"label": "no selection", "value": "None"}]
 
@@ -380,7 +381,7 @@ def get_time_estimate(clicked, pdb_entries):
     if clicked and pdb_entries:
         pdb_entries = [decompress_object(x) for x in pdb_entries]
         time = get_estimated_time(pdb_entries)
-        return f"ETA: {np.round(time, 2)} min"
+        return f"Estimated time: {np.round(time, 2)} min"
     else:
         return ""
 
@@ -408,6 +409,7 @@ def align_structures(clicked, pdb_entries, pfam_class, gap_open, gap_extend):
         pdb_entries = [decompress_object(x) for x in pdb_entries]
 
         if gap_open and gap_extend:
+            # TODO: add try except here to fix zero division error
             alignment, pdbs, features = pfam_class.multiple_structure_alignment_from_pfam(pdb_entries,
                                                                                           gap_open_penalty=gap_open,
                                                                                           gap_extend_penalty=gap_extend)
@@ -424,7 +426,7 @@ def align_structures(clicked, pdb_entries, pfam_class, gap_open, gap_extend):
         return "", component, dcc.Graph(figure=structure_plot({s.name: s.coords for s in pfam_class.msa.structures}),
                                         id="scatter3d"), compress_object(
             features), [{"label": x, "value": x} for x in features[list(features.keys())[0]]], compress_object(
-            alignment), compress_object(pfam_class), [True]
+            alignment), compress_object(pfam_class), [True]  # TODO: Test the features != secondary part
     else:
         return "", "", "", compress_object(np.zeros(0)), [
             {"label": "no alignment present", "value": "no alignment"}], pdb_entries, pfam_class, [False]
