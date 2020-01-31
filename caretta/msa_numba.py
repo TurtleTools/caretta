@@ -64,7 +64,7 @@ def make_pairwise_rmsd_score_matrix(coords_array, secondary_array, lengths_array
                                                                       dtw_aln_1, dtw_aln_2)
             rotation_matrix, translation_matrix = rmsd_calculations.svd_superimpose(common_coords_1[:, :3], common_coords_2[:, :3])
             common_coords_2[:, :3] = rmsd_calculations.apply_rotran(common_coords_2[:, :3], rotation_matrix, translation_matrix)
-            score = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2, gamma, True)
+            score = rmsd_calculations.get_rmsd(common_coords_1, common_coords_2)
             pairwise_matrix[i, j] = score
     pairwise_matrix += pairwise_matrix.T
     return pairwise_matrix

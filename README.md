@@ -8,8 +8,18 @@ The command-line tool and self-hosted web application do not have this restricti
 ## Installation
 
 ### Requirements
+#### Operating system support
+1. Linux and Mac
+* All capabilities are supported
+2. Windows
+* The external tool **msms** is not available in Windows. Due to this:
+    * Feature extraction is not available.
+    * `extract-all-features` argument in caretta-cli should be always False. 
+    * `caretta-app` is not available.
+
+#### Software
 Caretta works with Python 3.7+
-Run the following commands to install required external dependencies:
+Run the following commands to install required external dependencies (Mac and Linux only):
 ```bash
 conda install -c salilab dssp
 conda install -c bioconda msms
@@ -21,7 +31,7 @@ git clone https://git.wur.nl/durai001/caretta.git
 cd caretta
 ```
 
-### Install both the command-line interface and the web-application:
+### Install both the command-line interface and the web-application (Mac and Linux only):
 ```bash
 pip install -e ".[GUI]"
 ```
@@ -47,7 +57,7 @@ caretta-cli input_pdb_folder
 # caretta-cli -h for more options
 ```
 
-### Web-application Usage
+### Web-application Usage (Mac and Linux only)
 
 ```bash
 caretta-app <host-ip> <port> 
