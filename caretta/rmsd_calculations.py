@@ -1,14 +1,15 @@
 import numba as nb
 import numpy as np
 
-@nb.njit
+
+# @nb.njit
 # @numba_cc.export('normalize', 'f64[:](f64[:])')
 def normalize(numbers):
     minv, maxv = np.min(numbers), np.max(numbers)
     return (numbers - minv) / (maxv - minv)
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('nb_mean_axis_0', 'f64[:](f64[:])')
 def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
     """
@@ -20,7 +21,7 @@ def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
     return mean_array
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('svd_superimpose', '(f64[:], f64[:])')
 def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
     """
@@ -50,7 +51,7 @@ def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
     return rotation_matrix.astype(np.float64), translation_matrix.astype(np.float64)
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('apply_rotran', '(f64[:], f64[:], f64[:])')
 def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_matrix: np.ndarray) -> np.ndarray:
     """
@@ -70,7 +71,7 @@ def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_ma
 
 
 # @numba_cc.export('superpose_with_pos', '(f64[:], f64[:], f64[:], f64[:])')
-@nb.njit
+# @nb.njit
 def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
     """
     Superpose two sets of un-aligned coordinates using smaller subsets of aligned coordinates
@@ -93,7 +94,7 @@ def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
     return coords_1, coords_2, common_coords_2_rot
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('make_distance_matrix', '(f64[:], f64[:], f64, b1)')
 def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized=False) -> np.ndarray:
     """
@@ -121,7 +122,7 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, norm
         return distance_matrix
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_rmsd', '(f64[:], f64[:])')
 def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
     """
@@ -130,7 +131,7 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
     return np.sqrt(np.sum((coords_1 - coords_2) ** 2) / coords_1.shape[0])
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_caretta_score', '(f64[:], f64[:], f64, b1)')
 def get_caretta_score(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized) -> float:
     """
