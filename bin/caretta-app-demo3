@@ -184,7 +184,7 @@ regions which correlate with a given property.
 All the generated data can further be exported for downstream use.""")
 
 pfam_selection_text_web = """Choose a Pfam ID and click on Load Structures. 
-Then use the dropdown box to select which PDB IDs to align. The PDB IDs also include the chain ID and the residue range which is extracted, corresponding to the pfam domain."""
+Then use the dropdown box to select which PDB IDs to align. The PDB IDs also include the chain ID and the retrieved residue range that contain the selected pfam domain."""
 structure_alignment_text = """Click on a residue to see its position on the feature alignment in the next section."""
 feature_alignment_text = """Click on a position in the feature alignment to see the corresponding residues in the previous section."""
 
