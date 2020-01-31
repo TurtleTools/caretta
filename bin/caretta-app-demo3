@@ -4,6 +4,7 @@ import base64
 import os
 import pickle
 from zipfile import ZipFile
+import datetime
 
 import dash
 import dash_bio as dashbio
@@ -371,7 +372,7 @@ def get_estimated_time(pdb_entries):
     n = len(pdb_entries)
     l = max(p.PdbResNumEnd - p.PdbResNumStart for p in pdb_entries)
     func = lambda x, r: (x[0] ** 2 * r * x[1] ** 2)
-    return func((l, n), 9.14726052e-06) / 60
+    return str(datetime.timedelta(seconds=func((l, n), 9.14726052e-06)))
 
 
 @app.callback(dash.dependencies.Output("time-estimate", "children"),
@@ -381,7 +382,7 @@ def get_time_estimate(clicked, pdb_entries):
     if clicked and pdb_entries:
         pdb_entries = [decompress_object(x) for x in pdb_entries]
         time = get_estimated_time(pdb_entries)
-        return f"Estimated time: {np.round(time, 2)} min"
+        return f"Estimated time: {time}"
     else:
         return ""
 
