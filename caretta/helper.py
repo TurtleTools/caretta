@@ -8,7 +8,7 @@ import numpy as np
 import prody as pd
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('nan_normalize', 'f64[:](f64[:])')
 def nan_normalize(numbers):
     minv, maxv = np.nanmin(numbers), np.nanmax(numbers)
@@ -42,7 +42,7 @@ def aligned_string_to_array(aln: str) -> np.ndarray:
     return aln_array
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_common_positions', '(i64[:], i64[:], i64)')
 def get_common_positions(aln_array_1, aln_array_2, gap=-1):
     """
@@ -63,7 +63,7 @@ def get_common_positions(aln_array_1, aln_array_2, gap=-1):
     return pos_1, pos_2
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_aligned_data', '(i64[:], f64[:], i64)')
 def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
     """
@@ -90,7 +90,7 @@ def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
     return aln_coords
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_aligned_string_data', '(i64[:], i8[:], i64)')
 def get_aligned_string_data(aln_array, data, gap=-1):
     pos = np.array([i for i in range(len(aln_array)) if aln_array[i] != gap])
