@@ -4,7 +4,7 @@ import numpy as np
 MINV = np.finfo(np.float64).min
 
 
-# @nb.njit
+@nb.njit
 # @numba_cc.export('_make_dtw_matrix', 'f64[:](f64[:], f64, f64)')
 def _make_dtw_matrix(distance_matrix: np.ndarray,
                      gap_open_penalty: float = 0.,
@@ -71,7 +71,7 @@ def _make_dtw_matrix(distance_matrix: np.ndarray,
     return matrix, backtrack
 
 
-# @nb.njit
+@nb.njit
 # @numba_cc.export('_get_dtw_alignment', '(i64, i64[:], i64, i64)')
 def _get_dtw_alignment(start_direction, backtrack: np.ndarray, n1, m1):
     """

@@ -46,7 +46,7 @@ def dtw_signals_index(coords_1, coords_2, index, size=30, overlap=1):
     return coords_1, coords_2
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_dtw_signal_score_pos', '(f64[:], f64[:], f64, i64, f64, f64)')
 def get_dtw_signal_score_pos(coords_1, coords_2, gamma, index, gap_open_penalty, gap_extend_penalty):
     coords_1[:, :3], coords_2[:, :3] = dtw_signals_index(coords_1[:, :3], coords_2[:, :3], index)
@@ -75,7 +75,7 @@ def get_secondary_distance_matrix(secondary_1, secondary_2, gap=0):
     return score_matrix
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_secondary_rmsd_pos', '(i8[:], i8[:], f64[:], f64[:], f64, f64, f64)')
 def get_secondary_rmsd_pos(secondary_1, secondary_2, coords_1, coords_2, gamma, gap_open_sec, gap_extend_sec):
     distance_matrix = get_secondary_distance_matrix(secondary_1, secondary_2)
