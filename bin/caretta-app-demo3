@@ -373,18 +373,17 @@ def get_estimated_time(pdb_entries):
     return func((l, n), 9.14726052e-06) / 60
 
 
-@app.callback([dash.dependencies.Output("time-estimate", "children"),
-               dash.dependencies.Output("alignment-done", "children")],
+@app.callback(dash.dependencies.Output("time-estimate", "children"),
               [dash.dependencies.Input("align", "n_clicks"),
                dash.dependencies.Input("alignment-done", "children")],
               [dash.dependencies.State("structure-selection", "value")])
 def get_time_estimate(clicked, aln_done, pdb_entries):
-    if aln_done[0]:
-        return "", [False]
-    elif clicked and pdb_entries:
+    if clicked and pdb_entries:
         pdb_entries = [decompress_object(x) for x in pdb_entries]
         time = get_estimated_time(pdb_entries)
-        return f"ETA: {np.round(time,2)} min", [False]
+        return f"ETA: {np.round(time, 2)} min"
+    if aln_done[0]:
+        return ""
     else:
         return ""
 
