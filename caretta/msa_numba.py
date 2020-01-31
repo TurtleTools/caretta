@@ -52,6 +52,9 @@ def make_pairwise_rmsd_score_matrix(coords_array, secondary_array, lengths_array
     pairwise_matrix = np.zeros((coords_array.shape[0], coords_array.shape[0]))
     for i in nb.prange(pairwise_matrix.shape[0] - 1):
         for j in range(i + 1, pairwise_matrix.shape[1]):
+            print(i, j)
+            print(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
+                  secondary_array[i, :lengths_array[i]], secondary_array[j, :lengths_array[j]])
             dtw_aln_1, dtw_aln_2, score = psa.get_pairwise_alignment(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
                                                                      secondary_array[i, :lengths_array[i]], secondary_array[j, :lengths_array[j]],
                                                                      gamma,
