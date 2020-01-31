@@ -372,7 +372,7 @@ def get_estimated_time(pdb_entries):
     n = len(pdb_entries)
     l = max(p.PdbResNumEnd - p.PdbResNumStart for p in pdb_entries)
     func = lambda x, r: (x[0] ** 2 * r * x[1] ** 2)
-    return str(datetime.timedelta(seconds=func((l, n), 9.14726052e-06)))
+    return str(datetime.timedelta(seconds=int(func((l, n), 9.14726052e-06))))
 
 
 @app.callback(dash.dependencies.Output("time-estimate", "children"),
