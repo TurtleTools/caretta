@@ -361,7 +361,7 @@ def show_selected_atoms(clicked, pfam_class, pfam_id):
     if clicked and pfam_class and pfam_id:
         pfam_class = decompress_object(pfam_class)
         pfam_structures = pfam_class.get_entries_for_pfam(pfam_id)
-        return [{"label": x.PDB_ID, "value": compress_object(x)} for x in pfam_structures]
+        return [{"label": f"{x.PDB_ID}.{x.CHAIN_ID}", "value": compress_object(x)} for x in pfam_structures]
     else:
         return [{"label": "no selection", "value": "None"}]
 
