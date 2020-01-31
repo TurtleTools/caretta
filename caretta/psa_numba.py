@@ -5,7 +5,7 @@ from caretta import dynamic_time_warping as dtw
 from caretta import rmsd_calculations, helper
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('make_signal_index', 'f64[:](f64[:], i64)')
 def make_signal_index(coords, index):
     centroid = coords[index]
@@ -15,7 +15,7 @@ def make_signal_index(coords, index):
     return distances
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('dtw_signals_index', '(f64[:], f64[:], i64, i64, i64)')
 def dtw_signals_index(coords_1, coords_2, index, size=30, overlap=1):
     signals_1 = np.zeros(((coords_1.shape[0] - size) // overlap, size))
@@ -46,7 +46,7 @@ def dtw_signals_index(coords_1, coords_2, index, size=30, overlap=1):
     return coords_1, coords_2
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_dtw_signal_score_pos', '(f64[:], f64[:], f64, i64, f64, f64)')
 def get_dtw_signal_score_pos(coords_1, coords_2, gamma, index, gap_open_penalty, gap_extend_penalty):
     coords_1[:, :3], coords_2[:, :3] = dtw_signals_index(coords_1[:, :3], coords_2[:, :3], index)
@@ -61,7 +61,7 @@ def get_dtw_signal_score_pos(coords_1, coords_2, gamma, index, gap_open_penalty,
     return rmsd_calculations.get_caretta_score(common_coords_1, common_coords_2, gamma, False), pos_1, pos_2
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_secondary_distance_matrix', '(i8[:], i8[:], i8)')
 def get_secondary_distance_matrix(secondary_1, secondary_2, gap=0):
     score_matrix = np.zeros((secondary_1.shape[0], secondary_2.shape[0]))
@@ -75,7 +75,7 @@ def get_secondary_distance_matrix(secondary_1, secondary_2, gap=0):
     return score_matrix
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_secondary_rmsd_pos', '(i8[:], i8[:], f64[:], f64[:], f64, f64, f64)')
 def get_secondary_rmsd_pos(secondary_1, secondary_2, coords_1, coords_2, gamma, gap_open_sec, gap_extend_sec):
     distance_matrix = get_secondary_distance_matrix(secondary_1, secondary_2)
@@ -87,14 +87,14 @@ def get_secondary_rmsd_pos(secondary_1, secondary_2, coords_1, coords_2, gamma, 
     return rmsd_calculations.get_caretta_score(common_coords_1, common_coords_2, gamma, False), pos_1, pos_2
 
 
-@nb.njit
+# @nb.njit
 # @numba_cc.export('get_pairwise_alignment', '(f64[:], f64[:], i8[:], i8[:], f64, f64, f64, f64, f64, i64)')
 def get_pairwise_alignment(coords_1, coords_2,
                            secondary_1, secondary_2,
                            gamma,
                            gap_open_sec, gap_extend_sec,
                            gap_open_penalty,
-                           gap_extend_penalty, max_iter=100):
+                           gap_extend_penalty, max_iter=3):
     rmsd_1, pos_1_1, pos_2_1 = get_dtw_signal_score_pos(coords_1, coords_2, gamma, 0, gap_open_penalty, gap_extend_penalty)
     rmsd_2, pos_1_2, pos_2_2 = get_secondary_rmsd_pos(secondary_1, secondary_2, coords_1[:, :3], coords_2[:, :3], gamma, gap_open_sec, gap_extend_sec)
     rmsd_3, pos_1_3, pos_2_3 = get_dtw_signal_score_pos(coords_1, coords_2, gamma, -1, gap_open_penalty, gap_extend_penalty)
