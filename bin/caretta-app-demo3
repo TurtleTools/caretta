@@ -57,8 +57,8 @@ def feature_line(features, alignment):
     y_se = np.array([np.nanstd(z[:, x]) / np.sqrt(z.shape[1]) for x in range(z.shape[1])])
 
     data = [dict(y=list(y + y_se) + list(y - y_se)[::-1], x=list(range(length)) + list(range(length))[::-1],
-                 fillcolor="lightblue", fill="toself", type="scatter", mode="lines", name="Standard error",
-                 line=dict(color='lightblue')),
+                 fillcolor="lightblue", fill="toself", type="scatter", mode="lines", name="Mean +/- standard error",
+                 line=dict(color='red')),
             dict(y=y, x=np.arange(length), type="scatter", mode="lines", name="Mean",
                  line=dict(color='blue'))]
     return dict(data=data, layout=dict(legend=dict(x=0.5, y=1.2), margin=dict(l=25, r=25, t=25, b=25)))
