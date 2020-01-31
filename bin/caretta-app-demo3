@@ -380,10 +380,10 @@ def get_estimated_time(pdb_entries):
 def get_time_estimate(clicked, aln_done, pdb_entries):
     if aln_done[0]:
         return ""
-    if clicked and pdb_entries:
+    elif clicked and pdb_entries:
         pdb_entries = [decompress_object(x) for x in pdb_entries]
         time = get_estimated_time(pdb_entries)
-        return f"ETA: {time} min"
+        return f"ETA: {np.round(time,2)} min"
     else:
         return ""
 
