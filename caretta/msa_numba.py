@@ -13,14 +13,14 @@ from caretta import psa_numba as psa
 from caretta import rmsd_calculations, helper
 
 
-# @nb.njit
+@nb.njit
 def get_common_coordinates(coords_1, coords_2, aln_1, aln_2, gap=-1):
     assert aln_1.shape == aln_2.shape
     pos_1, pos_2 = helper.get_common_positions(aln_1, aln_2, gap)
     return coords_1[pos_1], coords_2[pos_2]
 
 
-# @nb.njit
+@nb.njit
 def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array, gamma,
                                    gap_open_penalty: float, gap_extend_penalty: float,
                                    gap_open_sec, gap_extend_sec):
@@ -45,16 +45,13 @@ def make_pairwise_dtw_score_matrix(coords_array, secondary_array, lengths_array,
     return pairwise_matrix
 
 
-# @nb.njit(parallel=True)
+@nb.njit(parallel=True)
 def make_pairwise_rmsd_score_matrix(coords_array, secondary_array, lengths_array, gamma,
                                    gap_open_penalty: float, gap_extend_penalty: float,
                                    gap_open_sec, gap_extend_sec):
     pairwise_matrix = np.zeros((coords_array.shape[0], coords_array.shape[0]))
     for i in nb.prange(pairwise_matrix.shape[0] - 1):
         for j in range(i + 1, pairwise_matrix.shape[1]):
-            print(i, j)
-            print(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
-                  secondary_array[i, :lengths_array[i]], secondary_array[j, :lengths_array[j]])
             dtw_aln_1, dtw_aln_2, score = psa.get_pairwise_alignment(coords_array[i, :lengths_array[i]], coords_array[j, :lengths_array[j]],
                                                                      secondary_array[i, :lengths_array[i]], secondary_array[j, :lengths_array[j]],
                                                                      gamma,
@@ -73,7 +70,7 @@ def make_pairwise_rmsd_score_matrix(coords_array, secondary_array, lengths_array
     return pairwise_matrix
 
 
-# @nb.njit
+@nb.njit
 def _get_alignment_data(coords_1, coords_2, secondary_1, secondary_2, gamma,
                         gap_open_sec, gap_extend_sec,
                         gap_open_penalty: float, gap_extend_penalty: float):
@@ -95,7 +92,7 @@ def _get_alignment_data(coords_1, coords_2, secondary_1, secondary_2, gamma,
     return aln_coords_1, aln_coords_2, aln_sec_1, aln_sec_2, dtw_aln_1, dtw_aln_2
 
 
-# @nb.njit
+@nb.njit
 def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) -> np.ndarray:
     """
     Mean of two coordinate sets (of the same shape)
@@ -119,7 +116,7 @@ def get_mean_coords_extra(aln_coords_1: np.ndarray, aln_coords_2: np.ndarray) ->
     return mean_coords
 
 
-# @nb.njit
+@nb.njit
 def get_mean_secondary(aln_sec_1: np.ndarray, aln_sec_2: np.ndarray, gap=0) -> np.ndarray:
     """
     Mean of two coordinate sets (of the same shape)

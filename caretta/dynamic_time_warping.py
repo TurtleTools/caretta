@@ -131,7 +131,7 @@ def _get_dtw_alignment(start_direction, backtrack: np.ndarray, n1, m1):
     return indices_1[:index][::-1], indices_2[:index][::-1]
 
 
-# @nb.njit
+@nb.njit
 # @numba_cc.export('dtw_align', '(f64[:], f64, f64)')
 def dtw_align(distance_matrix: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty: float = 0.):
     """
