@@ -244,6 +244,8 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta",
                                                                 type="default"),
                                                     html.P(id="time-estimate", style={"text-align": "center"},
                                                            children="", className="row"),
+                                                    html.P(id="is-it-done", style={"text-align": "center"},
+                                                           children="", className="row"),
                                                     html.Div(id="alignment-done", style={"display": "none"},
                                                              children=[False]),
                                                     ],
@@ -366,6 +368,7 @@ def show_selected_atoms(clicked, pfam_class, pfam_id):
         return [{"label": "no selection", "value": "None"}]
 
 
+
 def get_estimated_time(pdb_entries):
     n = len(pdb_entries)
     l = max(p.PdbResNumEnd - p.PdbResNumStart for p in pdb_entries)
@@ -373,17 +376,24 @@ def get_estimated_time(pdb_entries):
     return func((l, n), 9.14726052e-06) / 60
 
 
-@app.callback(dash.dependencies.Output("time-estimate", "children"),
-              [dash.dependencies.Input("align", "n_clicks"),
-               dash.dependencies.Input("alignment-done", "children")],
+@app.callback([dash.dependencies.Output("time-estimate", "children"),
+               dash.dependencies.Output("alignment-done", "children")],
+              [dash.dependencies.Input("align", "n_clicks")],
               [dash.dependencies.State("structure-selection", "value")])
-def get_time_estimate(clicked, aln_done, pdb_entries):
+def get_time_estimate(clicked, pdb_entries):
     if clicked and pdb_entries:
         pdb_entries = [decompress_object(x) for x in pdb_entries]
         time = get_estimated_time(pdb_entries)
-        return f"ETA: {np.round(time, 2)} min"
-    if aln_done[0]:
-        return ""
+        return f"ETA: {np.round(time, 2)} min", [False]
+    else:
+        return "", [False]
+
+
+@app.callback(dash.dependencies.Output("is-it-done", "children"),
+              [dash.dependencies.Input("alignment-done", "children")])
+def is_it_done(done):
+    if done[0]:
+        return "Alignment done!"
     else:
         return ""
 
