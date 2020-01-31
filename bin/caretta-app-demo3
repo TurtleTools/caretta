@@ -244,8 +244,6 @@ app.layout = html.Div(children=[html.Div(html.Div([html.H1("Caretta",
                                                                 type="default"),
                                                     html.P(id="time-estimate", style={"text-align": "center"},
                                                            children="", className="row"),
-                                                    html.P(id="is-it-done", style={"text-align": "center"},
-                                                           children="", className="row"),
                                                     html.Div(id="alignment-done", style={"display": "none"},
                                                              children=[False]),
                                                     ],
@@ -368,7 +366,6 @@ def show_selected_atoms(clicked, pfam_class, pfam_id):
         return [{"label": "no selection", "value": "None"}]
 
 
-
 def get_estimated_time(pdb_entries):
     n = len(pdb_entries)
     l = max(p.PdbResNumEnd - p.PdbResNumStart for p in pdb_entries)
@@ -376,23 +373,14 @@ def get_estimated_time(pdb_entries):
     return func((l, n), 9.14726052e-06) / 60
 
 
-@app.callback([dash.dependencies.Output("time-estimate", "children")],
+@app.callback(dash.dependencies.Output("time-estimate", "children"),
               [dash.dependencies.Input("align", "n_clicks")],
               [dash.dependencies.State("structure-selection", "value")])
 def get_time_estimate(clicked, pdb_entries):
     if clicked and pdb_entries:
         pdb_entries = [decompress_object(x) for x in pdb_entries]
         time = get_estimated_time(pdb_entries)
-        return f"ETA: {np.round(time, 2)} min"
-    else:
-        return ""
-
-
-@app.callback(dash.dependencies.Output("is-it-done", "children"),
-              [dash.dependencies.Input("alignment-done", "children")])
-def is_it_done(done):
-    if done[0]:
-        return "Alignment done!"
+        return html.P(f"ETA: {np.round(time, 2)} min", style={"color": "red"})
     else:
         return ""
 
@@ -405,16 +393,17 @@ def is_it_done(done):
      dash.dependencies.Output("feature-selection", "options"),
      dash.dependencies.Output("alignment-data", "children"),
      dash.dependencies.Output("pfam-class", "children"),
-     dash.dependencies.Output("alignment-done", "children")],
+     dash.dependencies.Output("alignment-done", "children"),
+     dash.dependencies.Output("time-estimate", "style")
+     ],
 
-    [dash.dependencies.Input("align", "n_clicks"),
-     dash.dependencies.Input("is-it-done", "children")],
+    [dash.dependencies.Input("align", "n_clicks")],
 
     [dash.dependencies.State("structure-selection", "value"),
      dash.dependencies.State("pfam-class", "children"),
      dash.dependencies.State("gap-open", "value"),
      dash.dependencies.State("gap-extend", "value")])
-def align_structures(clicked, done, pdb_entries, pfam_class, gap_open, gap_extend):
+def align_structures(clicked, pdb_entries, pfam_class, gap_open, gap_extend):
     if clicked and pdb_entries and pfam_class:
         pfam_class = decompress_object(pfam_class)
         pdb_entries = [decompress_object(x) for x in pdb_entries]
@@ -436,10 +425,11 @@ def align_structures(clicked, done, pdb_entries, pfam_class, gap_open, gap_exten
         return "", component, dcc.Graph(figure=structure_plot({s.name: s.coords for s in pfam_class.msa.structures}),
                                         id="scatter3d"), compress_object(
             features), [{"label": x, "value": x} for x in features[list(features.keys())[0]]], compress_object(
-            alignment), compress_object(pfam_class), [True]
+            alignment), compress_object(pfam_class), [True], {"color": "green"}
     else:
         return "", "", "", compress_object(np.zeros(0)), [
-            {"label": "no alignment present", "value": "no alignment"}], pdb_entries, pfam_class, [False]
+            {"label": "no alignment present", "value": "no alignment"}], pdb_entries, pfam_class, [False], {
+                   "color": "green"}
 
 
 @app.callback([dash.dependencies.Output("feature-plot1", "children"),
