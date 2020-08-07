@@ -6,6 +6,7 @@ from pathlib import Path
 import numba as nb
 import numpy as np
 import prody as pd
+from scipy.spatial.distance import pdist, squareform
 from geometricus import protein_utility, geometricus, utility
 
 from caretta import dynamic_time_warping as dtw, neighbor_joining as nj, score_functions, superposition_functions, feature_extraction
@@ -109,7 +110,7 @@ class StructureMultiple:
     @staticmethod
     def align_from_pdb_files(input_pdb, gap_open_penalty=1., gap_extend_penalty=0.01, consensus_weight=1.,
                              output_folder=Path("../caretta_results"),
-                             extract_features=True, num_threads=20,
+                             num_threads=20,
                              write_fasta=False,
                              write_pdb=False,
                              write_features=False,
@@ -135,8 +136,6 @@ class StructureMultiple:
             default 1
         output_folder
             default "caretta_results"
-        extract_features
-            default True
         num_threads
             Number of threads to use for feature extraction
         write_fasta
@@ -146,7 +145,7 @@ class StructureMultiple:
             True => writes all protein PDB files superposed by alignment (default True)
              writes to output_folder / superposed_pdb
         write_features
-            True => writes aligned features as a dictionary of numpy arrays into a pickle file (default True)
+            True => extracts and writes aligned features as a dictionary of numpy arrays into a pickle file (default True)
             writes to output_folder / result_features.pkl
         write_class
             True => writes StructureMultiple class with intermediate structures and tree to pickle file (default True)
@@ -219,7 +218,7 @@ class StructureMultiple:
 
     def get_pairwise_alignment(self, coords_1, coords_2, parameters,
                                gap_open_penalty: float, gap_extend_penalty: float,
-                               weight=False, weights_1=None, weights_2=None, n_iter=3):
+                               weight=False, weights_1=None, weights_2=None, n_iter=10):
         """
         Aligns coords_1 to coords_2 by first superposing and then running dtw on the score matrix of the superposed coordinate sets
         Parameters
@@ -270,7 +269,7 @@ class StructureMultiple:
                 break
         return dtw_aln_array_1, dtw_aln_array_2, dtw_score, coords_1, coords_2
 
-    def make_pairwise_shape_matrix(self, resolution: np.ndarray, kmer_size=30, radius=10):
+    def make_pairwise_shape_matrix(self, resolution: np.ndarray, kmer_size=30, radius=10, metric="braycurtis"):
         """
         Makes an all vs. all matrix of distance scores between all the structures.
         Distance is measured by the braycurtis distance of each structure's normalized shape counts.
@@ -279,6 +278,8 @@ class StructureMultiple:
         resolution
         kmer_size
         radius
+        metric
+            distance metric (accepts any metric supported by scipy.spatial.distance
 
         Returns
         -------
@@ -297,7 +298,7 @@ class StructureMultiple:
                              range(pairwise_matrix.shape[0])}
         shapes = geometricus.GeometricusEmbedding(kmer_invariants, radius_invariants, resolution,
                                                   [self.structures[i].name for i in range(len(self.structures))])
-        return get_pairwise_braycurtis(shapes.embedding)
+        return squareform(pdist(shapes.embedding, metric=metric))
 
     def make_pairwise_dtw_matrix(self, parameters: dict, gap_open_penalty: float, gap_extend_penalty: float, invert=True):
         """
@@ -510,9 +511,9 @@ class StructureMultiple:
             alignments = self.alignment
         reference_index = np.argmax([s.length for s in self.structures])
         reference_key = self.structures[reference_index].name
-        core_indices = np.array([i for i in range(len(alignments[reference_key])) if '-' not in [alignments[n][i] for n in alignments]])
+        # core_indices = np.array([i for i in range(len(alignments[reference_key])) if '-' not in [alignments[n][i] for n in alignments]])
         aln_ref = alignments[reference_key]
-        ref_coords = self.structures[reference_index].coordinates[np.array([aln_ref[c] for c in core_indices])]
+        # ref_coords = self.structures[reference_index].coordinates[np.array([aln_ref[c] for c in core_indices])]
         # ref_centroid = general_utility.nb_mean_axis_0(ref_coords)
         # ref_coords -= ref_centroid
         for i in range(len(self.structures)):

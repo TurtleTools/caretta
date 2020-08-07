@@ -1,8 +1,7 @@
 import numba as nb
 import numpy as np
 from caretta import dynamic_time_warping as dtw, score_functions
-from geometricus import moment_utility, utility
-import prody as pd
+from geometricus import utility, geometricus
 
 GAP_OPEN = 0
 GAP_EXTEND = 0
@@ -52,63 +51,59 @@ def signal_svd_superpose_function(coords_1, coords_2, parameters, score_function
     return dtw_svd_superpose_function(coords_1, coords_2, parameters, score_function)
 
 
-@nb.njit
-def get_moments_kmer(coords, kmer_size=30, scale=True):
-    res = np.zeros((coords.shape[0], moment_utility.NUM_MOMENTS))
-    half = kmer_size // 2
-    for i in nb.prange(res.shape[0]):
-        res[i, :] = moment_utility.get_second_order_moments(coords[max(0, i - half): min(coords.shape[0], i + half)])
-    if scale:
-        return np.log1p(res)
-    else:
-        return res
-
-
-def get_moments_radius(coords, radius=4, scale=True):
-    indices = []
-    kd_tree = pd.KDTree(coords)
-    for i in range(coords.shape[0]):
-        kd_tree.search(center=coords[i], radius=radius)
-        indices.append(kd_tree.getIndices())
-    moments = np.zeros((len(indices), moment_utility.NUM_MOMENTS))
-    for i in range(len(indices)):
-        moments[i] = moment_utility.get_second_order_moments(coords[indices[i]])
-    if scale:
-        return np.log1p(moments)
-    else:
-        return moments
-
-
 def moment_superpose_function(coords_1, coords_2, parameters, score_function=score_functions.get_caretta_score):
     """
     Uses 4 rotation/translation invariant moments for each 5-mer to run DTW
     """
-    if parameters["split_type"] == "kmer":
-        moments_1, moments_2 = get_moments_kmer(coords_1, parameters["split_size"], parameters["scale"]), get_moments_kmer(coords_2,
-                                                                                                                           parameters["split_size"],
-                                                                                                                           parameters["scale"])
-    else:
-        moments_1, moments_2 = get_moments_radius(coords_1, parameters["split_size"], parameters["scale"]), get_moments_radius(coords_2, parameters[
-            "split_size"], parameters["scale"])
+    moments_1 = geometricus.MomentInvariants.from_coordinates("name", coords_1, split_type=parameters["split_type"], split_size=parameters["split_size"], upsample_rate=parameters["upsample_rate"]).moments
+    moments_2 = geometricus.MomentInvariants.from_coordinates("name", coords_2, split_type=parameters["split_type"], split_size=parameters["split_size"], upsample_rate=parameters["upsample_rate"]).moments
+    if parameters["scale"]:
+        moments_1 = np.log1p(moments_1)
+        moments_2 = np.log1p(moments_2)
     score_matrix = score_functions.make_score_matrix(moments_1, moments_2, score_function, normalized=False)
-    score, coords_1, coords_2, _, _ = _align_and_superpose(coords_1, coords_2, score_matrix, parameters["gap_open_penalty"],
+    score, coords_1, coords_2, _, _ = _align_and_superpose(coords_1, coords_2, score_matrix,
+                                                           parameters["gap_open_penalty"],
                                                            parameters["gap_extend_penalty"])
     return score, coords_1, coords_2
 
 
-def moment_superpose_function_both(coords_1, coords_2, parameters, score_function=score_functions.get_caretta_score):
+def moment_multiple_superpose_function(coords_1, coords_2, parameters, score_function=score_functions.get_caretta_score):
     """
     Uses 4 rotation/translation invariant moments for each 5-mer to run DTW
     """
-    moments_1_k, moments_2_k = get_moments_kmer(coords_1, parameters["kmer_size"]), get_moments_kmer(coords_2, parameters["kmer_size"])
-    moments_1_r, moments_2_r = get_moments_radius(coords_1, parameters["radius"]), get_moments_radius(coords_2, parameters["radius"])
-
-    moments_1 = moments_1_k + moments_1_r
-    moments_2 = moments_2_k + moments_2_r
+    moments_1 = []
+    moments_2 = []
+    for i in range(parameters["num_split_types"]):
+        if "upsample_rate" not in parameters:
+            parameters["upsample_rate"] = 10
+        moments_1_1 = geometricus.MomentInvariants.from_coordinates("name", coords_1,
+                                                                    split_type=parameters[f"split_type_{i}"],
+                                                                    split_size=parameters[f"split_size_{i}"],
+                                                                    upsample_rate=parameters["upsample_rate"]).moments
+        moments_2_1 = geometricus.MomentInvariants.from_coordinates("name", coords_2,
+                                                                    split_type=parameters[f"split_type_{i}"],
+                                                                    split_size=parameters[f"split_size_{i}"],
+                                                                    upsample_rate=parameters["upsample_rate"]).moments
+        if parameters["scale"]:
+            moments_1_1 = np.log1p(moments_1_1)
+            moments_2_1 = np.log1p(moments_2_1)
+        moments_1.append(moments_1_1 / np.max(moments_1_1, axis=0))
+        moments_2.append(moments_2_1 / np.max(moments_1_1, axis=0))
+    moments_1 = sum(moments_1)
+    moments_2 = sum(moments_2)
     score_matrix = score_functions.make_score_matrix(moments_1, moments_2, score_function, normalized=False)
-    score, coords_1, coords_2, _, _ = _align_and_superpose(coords_1, coords_2, score_matrix, parameters["gap_open_penalty"],
+    score, coords_1, coords_2, _, _ = _align_and_superpose(coords_1, coords_2, score_matrix,
+                                                           parameters["gap_open_penalty"],
                                                            parameters["gap_extend_penalty"])
     return score, coords_1, coords_2
+
+
+def moment_multiple_svd_superpose_function(coords_1, coords_2, parameters, score_function=score_functions.get_caretta_score):
+    """
+    Uses moment_superpose followed by dtw_svd_superpose
+    """
+    _, coords_1, coords_2 = moment_multiple_superpose_function(coords_1, coords_2, parameters)
+    return dtw_svd_superpose_function(coords_1, coords_2, parameters, score_function)
 
 
 def moment_svd_superpose_function(coords_1, coords_2, parameters, score_function=score_functions.get_caretta_score):

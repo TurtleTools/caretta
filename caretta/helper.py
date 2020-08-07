@@ -8,13 +8,6 @@ import numpy as np
 import prody as pd
 
 
-@nb.njit
-# @numba_cc.export('nan_normalize', 'f64[:](f64[:])')
-def nan_normalize(numbers):
-    minv, maxv = np.nanmin(numbers), np.nanmax(numbers)
-    return (numbers - minv) / (maxv - minv)
-
-
 def secondary_to_array(secondary):
     return np.array(secondary, dtype='S1').view(np.int8)
 

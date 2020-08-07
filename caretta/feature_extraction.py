@@ -5,7 +5,7 @@ import numpy as np
 import prody as pd
 import Bio.PDB
 from Bio.PDB.ResidueDepth import get_surface, residue_depth, ca_depth, min_dist
-from geometricus import utility
+from geometricus import utility, protein_utility
 
 
 def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
@@ -88,8 +88,8 @@ def get_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
     dict of anm_ca, anm_cb, gnm_ca, gnm_cb
     """
     data = {}
-    beta_indices = utility.get_beta_indices(protein)
-    alpha_indices = utility.get_alpha_indices(protein)
+    beta_indices = protein_utility.get_beta_indices(protein)
+    alpha_indices = protein_utility.get_alpha_indices(protein)
     data["anm_cb"] = get_anm_fluctuations(protein[beta_indices], n_modes)
     data["gnm_cb"] = get_gnm_fluctuations(protein[beta_indices], n_modes)
     data["anm_ca"] = get_anm_fluctuations(protein[alpha_indices], n_modes)
@@ -158,7 +158,6 @@ def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, force_overwrite=T
     pdb_file = str(pdb_file)
     _, name, _ = utility.get_file_parts(pdb_file)
     protein = pd.parsePDB(pdb_file).select("protein")
-    # if Path(pdb_file).suffix != ".pdb":
     pdb_file = str(Path(dssp_dir) / f"{name}.pdb")
     pd.writePDB(pdb_file, protein)
     protein = pd.parsePDB(pdb_file)
@@ -172,7 +171,6 @@ def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, force_overwrite=T
     else:
         data = {**data, **get_fluctuations(protein)}
         data = {**data, **get_residue_depths(pdb_file)}
-        # data = {**data, **get_electrostatics(protein, pdb_file, es_dir=dssp_dir)}
         return data
 
 
@@ -212,7 +210,7 @@ def get_dssp_features(protein_dssp):
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
     dssp_labels = [label for label in protein_dssp.getDataLabels() if label.startswith("dssp") and label not in dssp_ignore]
     data = {}
-    alpha_indices = utility.get_alpha_indices(protein_dssp)
+    alpha_indices = protein_utility.get_alpha_indices(protein_dssp)
     indices = [protein_dssp[x].getData("dssp_resnum") for x in alpha_indices]
     for label in dssp_labels:
         label_to_index = {i - 1: protein_dssp[x].getData(label) for i, x in zip(indices, alpha_indices)}

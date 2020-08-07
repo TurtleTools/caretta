@@ -4,7 +4,7 @@ from geometricus import utility
 
 
 @nb.njit
-def get_caretta_score(coord_1: np.ndarray, coord_2: np.ndarray, gamma=0.3):
+def get_caretta_score(coord_1: np.ndarray, coord_2: np.ndarray, gamma=0.03):
     """
     Gaussian (RBF) score of similarity between two coordinates
     """
