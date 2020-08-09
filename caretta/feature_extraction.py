@@ -5,7 +5,7 @@ import numpy as np
 import prody as pd
 import Bio.PDB
 from Bio.PDB.ResidueDepth import get_surface, residue_depth, ca_depth, min_dist
-from geometricus import utility, protein_utility
+from geometricus import protein_utility
 
 
 def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
@@ -24,7 +24,7 @@ def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
     structure Object, list of residue Objects, list of peptide Objects, sequence, sequence to residue index
     """
     if name is None:
-        (_, name, _) = utility.get_file_parts(input_file)
+        name = Path(input_file).stem
     input_file = str(input_file)
     structure = Bio.PDB.PDBParser().get_structure(name, input_file)
     if chain is not None:
@@ -170,7 +170,7 @@ def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, force_overwrite=T
     dict of features
     """
     pdb_file = str(pdb_file)
-    _, name, _ = utility.get_file_parts(pdb_file)
+    name = Path(pdb_file).stem
     protein = pd.parsePDB(pdb_file).select("protein")
     pdb_file = str(Path(dssp_dir) / f"{name}.pdb")
     pd.writePDB(pdb_file, protein)
