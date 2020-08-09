@@ -2,14 +2,11 @@ import pickle
 import typing
 from dataclasses import dataclass
 from pathlib import Path
-
 import numba as nb
 import numpy as np
 import prody as pd
 from scipy.spatial.distance import pdist, squareform
-from geometricus import geometricus, protein_utility
-from geometricus.moment_utility import nb_mean_axis_0
-
+from geometricus import Structure, MomentInvariants, SplitType, GeometricusEmbedding
 from caretta import (
     dynamic_time_warping as dtw,
     neighbor_joining as nj,
@@ -108,7 +105,7 @@ class StructureMultiple:
         indices of aligning residues from each structure, gaps are -1s
     """
 
-    structures: typing.List[protein_utility.Structure]
+    structures: typing.List[Structure]
     sequences: typing.Dict[str, str]
     superposition_function: typing.Callable[
         [
@@ -127,7 +124,7 @@ class StructureMultiple:
         [np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray
     ] = get_mean_coords
     consensus_weight: float = 1.0
-    final_structures: typing.Union[None, typing.List[protein_utility.Structure]] = None
+    final_structures: typing.Union[None, typing.List[Structure]] = None
     final_consensus_weights: typing.Union[None, typing.List[np.ndarray]] = None
     tree: typing.Union[None, np.ndarray] = None
     branch_lengths: typing.Union[None, np.ndarray] = None
@@ -255,9 +252,7 @@ class StructureMultiple:
             ]
             protein = protein[indices]
             coordinates = protein.getCoords()
-            structures.append(
-                protein_utility.Structure(pdb_name, coordinates.shape[0], coordinates)
-            )
+            structures.append(Structure(pdb_name, coordinates.shape[0], coordinates))
             sequences[pdb_name] = protein.getSequence()
         msa_class = StructureMultiple(
             structures,
@@ -371,31 +366,31 @@ class StructureMultiple:
         [n x n] distance matrix
         """
         kmer_invariants = [
-            geometricus.MomentInvariants.from_coordinates(
+            MomentInvariants.from_coordinates(
                 s.name,
                 s.coordinates,
                 None,
                 split_size=kmer_size,
-                split_type=geometricus.SplitType.KMER,
+                split_type=SplitType.KMER,
             )
             for s in self.structures
         ]
         radius_invariants = [
-            geometricus.MomentInvariants.from_coordinates(
+            MomentInvariants.from_coordinates(
                 s.name,
                 s.coordinates,
                 None,
                 split_size=radius,
-                split_type=geometricus.SplitType.RADIUS,
+                split_type=SplitType.RADIUS,
             )
             for s in self.structures
         ]
-        kmer_embedder = geometricus.GeometricusEmbedding.from_invariants(
+        kmer_embedder = GeometricusEmbedding.from_invariants(
             kmer_invariants,
             resolution=resolution,
             protein_keys=[s.name for s in self.structures],
         )
-        radius_embedder = geometricus.GeometricusEmbedding.from_invariants(
+        radius_embedder = GeometricusEmbedding.from_invariants(
             radius_invariants,
             resolution=resolution,
             protein_keys=[s.name for s in self.structures],
@@ -566,7 +561,7 @@ class StructureMultiple:
                 n1_weights, n2_weights, dtw_aln_1, dtw_aln_2
             )
             self.final_structures.append(
-                protein_utility.Structure(name_int, mean_coords.shape[0], mean_coords)
+                Structure(name_int, mean_coords.shape[0], mean_coords)
             )
             self.final_consensus_weights.append(mean_weights)
 
@@ -659,11 +654,11 @@ class StructureMultiple:
         )
         aln_ref = alignments[reference_name]
         ref_coords_core = (
-            reference_pdb[protein_utility.get_alpha_indices(reference_pdb)]
+            reference_pdb[helper.get_alpha_indices(reference_pdb)]
             .getCoords()
             .astype(np.float64)[np.array([aln_ref[c] for c in core_indices])]
         )
-        ref_centroid = nb_mean_axis_0(ref_coords_core)
+        ref_centroid = helper.nb_mean_axis_0(ref_coords_core)
         ref_coords_core -= ref_centroid
         transformation = pd.Transformation(np.eye(3), -ref_centroid)
         reference_pdb = pd.applyTransformation(transformation, reference_pdb)
@@ -675,7 +670,7 @@ class StructureMultiple:
             )
             aln_name = alignments[name]
             common_coords_2 = (
-                pdb[protein_utility.get_alpha_indices(pdb)]
+                pdb[helper.get_alpha_indices(pdb)]
                 .getCoords()
                 .astype(np.float64)[np.array([aln_name[c] for c in core_indices])]
             )
@@ -736,7 +731,7 @@ class StructureMultiple:
         # core_indices = np.array([i for i in range(len(alignments[reference_key])) if '-' not in [alignments[n][i] for n in alignments]])
         aln_ref = alignments[reference_key]
         # ref_coords = self.structures[reference_index].coordinates[np.array([aln_ref[c] for c in core_indices])]
-        # ref_centroid = nb_mean_axis_0(ref_coords)
+        # ref_centroid = helper.nb_mean_axis_0(ref_coords)
         # ref_coords -= ref_centroid
         for i in range(len(self.structures)):
             # if i == reference_index:

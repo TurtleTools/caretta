@@ -1,17 +1,6 @@
 import numba as nb
 import numpy as np
-
-
-@nb.njit
-def nan_normalize(numbers):
-    minv, maxv = np.nanmin(numbers), np.nanmax(numbers)
-    return (numbers - minv) / (maxv - minv)
-
-
-@nb.njit
-def normalize(numbers):
-    minv, maxv = np.min(numbers), np.max(numbers)
-    return (numbers - minv) / (maxv - minv)
+from caretta import helper
 
 
 @nb.njit
@@ -60,7 +49,7 @@ def make_score_matrix_python(
         for j in range(coords_2.shape[0]):
             score_matrix[i, j] = score_function(coords_1[i], coords_2[j])
     if normalized:
-        return normalize(score_matrix)
+        return helper.normalize(score_matrix)
     else:
         return score_matrix
 
@@ -88,7 +77,7 @@ def make_score_matrix(
         for j in range(coords_2.shape[0]):
             score_matrix[i, j] = score_function(coords_1[i], coords_2[j])
     if normalized:
-        return normalize(score_matrix)
+        return helper.normalize(score_matrix)
     else:
         return score_matrix
 
@@ -122,7 +111,6 @@ def get_total_score(
 
 
 @nb.njit
-# @numba_cc.export('get_common_positions', '(i64[:], i64[:], i64)')
 def get_common_positions(aln_array_1, aln_array_2, gap=-1):
     """
     Return positions where neither alignment has a gap
