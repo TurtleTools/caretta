@@ -89,6 +89,8 @@ class StructureMultiple:
     ---------------------
     structures
         list of protein_utility.Structure objects
+    superposition_parameters
+        dictionary of parameters to pass to the superposition function
     superposition_function
         a function that takes two coordinate sets as input and superposes them
         returns a score, superposed_coords_1, superposed_coords_2
@@ -107,6 +109,7 @@ class StructureMultiple:
 
     structures: typing.List[Structure]
     sequences: typing.Dict[str, str]
+    superposition_parameters: typing.Dict[str, typing.Any]
     superposition_function: typing.Callable[
         [
             np.ndarray,
@@ -134,6 +137,7 @@ class StructureMultiple:
     @staticmethod
     def align_from_pdb_files(
         input_pdb,
+        superposition_parameters: dict,
         gap_open_penalty=1.0,
         gap_extend_penalty=0.01,
         consensus_weight=1.0,
@@ -157,6 +161,8 @@ class StructureMultiple:
             A folder with input protein files
             A file which lists PDB filenames on each line
             A file which lists PDB IDs on each line
+        superposition_parameters
+            parameters to give to the superposition function
         gap_open_penalty
             default 1
         gap_extend_penalty
@@ -188,6 +194,7 @@ class StructureMultiple:
         """
         msa_class = StructureMultiple.from_pdb_files(
             input_pdb,
+            superposition_parameters,
             superposition_function=superposition_functions.moment_svd_superpose_function,
             consensus_weight=consensus_weight,
             output_folder=output_folder,
@@ -208,7 +215,8 @@ class StructureMultiple:
     def from_pdb_files(
         cls,
         input_pdb,
-        superposition_function,
+        superposition_parameters,
+        superposition_function=superposition_functions.moment_svd_superpose_function,
         score_function=score_functions.get_caretta_score,
         consensus_weight=1.0,
         output_folder=Path("./caretta_results"),
@@ -220,6 +228,8 @@ class StructureMultiple:
         ----------
         input_pdb
             list of pdb files/names or a folder containing pdb files
+        superposition_parameters
+            parameters to give to the superposition function
         superposition_function
             a function that takes two coordinate sets as input and superposes them
             returns a score, superposed_coords_1, superposed_coords_2
@@ -257,6 +267,7 @@ class StructureMultiple:
         msa_class = StructureMultiple(
             structures,
             sequences,
+            superposition_parameters,
             superposition_function,
             score_function=score_function,
             consensus_weight=consensus_weight,
@@ -268,7 +279,6 @@ class StructureMultiple:
         self,
         coords_1,
         coords_2,
-        parameters,
         gap_open_penalty: float,
         gap_extend_penalty: float,
         weight=False,
@@ -298,7 +308,7 @@ class StructureMultiple:
         #      _, coords_1[:, :-1], coords_2[:, :-1] = self.superposition_function(coords_1[:, :-1], coords_2[:, :-1])
         #  else:
         _, coords_1, coords_2 = self.superposition_function(
-            coords_1, coords_2, parameters
+            coords_1, coords_2, self.superposition_parameters
         )
         if weight:
             assert weights_1 is not None
@@ -348,7 +358,7 @@ class StructureMultiple:
         return dtw_aln_array_1, dtw_aln_array_2, dtw_score, coords_1, coords_2
 
     def make_pairwise_shape_matrix(
-        self, resolution: np.ndarray, kmer_size=30, radius=10, metric="braycurtis"
+        self, resolution: typing.Union[float, np.ndarray], kmer_size=30, radius=10, metric="braycurtis"
     ):
         """
         Makes an all vs. all matrix of distance scores between all the structures.
@@ -404,7 +414,6 @@ class StructureMultiple:
 
     def make_pairwise_dtw_matrix(
         self,
-        parameters: dict,
         gap_open_penalty: float,
         gap_extend_penalty: float,
         invert=True,
@@ -440,7 +449,6 @@ class StructureMultiple:
                 ) = self.get_pairwise_alignment(
                     coords_1,
                     coords_2,
-                    parameters,
                     gap_open_penalty=gap_open_penalty,
                     gap_extend_penalty=gap_extend_penalty,
                     weight=False,
@@ -457,7 +465,7 @@ class StructureMultiple:
         return pairwise_matrix
 
     def align(
-        self, pw_matrix, parameters, gap_open_penalty, gap_extend_penalty
+        self, pw_matrix, gap_open_penalty, gap_extend_penalty
     ) -> dict:
         """
         Makes a multiple structure alignment
@@ -482,7 +490,6 @@ class StructureMultiple:
             dtw_1, dtw_2, _, _, _ = self.get_pairwise_alignment(
                 coords_1,
                 coords_2,
-                parameters,
                 gap_open_penalty=gap_open_penalty,
                 gap_extend_penalty=gap_extend_penalty,
                 weight=False,
@@ -534,7 +541,6 @@ class StructureMultiple:
             ) = self.get_pairwise_alignment(
                 n1_coords,
                 n2_coords,
-                parameters,
                 gap_open_penalty=gap_open_penalty,
                 gap_extend_penalty=gap_extend_penalty,
                 weight=True,
