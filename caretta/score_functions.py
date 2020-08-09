@@ -1,6 +1,17 @@
 import numba as nb
 import numpy as np
-from geometricus import utility
+
+
+@nb.njit
+def nan_normalize(numbers):
+    minv, maxv = np.nanmin(numbers), np.nanmax(numbers)
+    return (numbers - minv) / (maxv - minv)
+
+
+@nb.njit
+def normalize(numbers):
+    minv, maxv = np.min(numbers), np.max(numbers)
+    return (numbers - minv) / (maxv - minv)
 
 
 @nb.njit
@@ -49,7 +60,7 @@ def make_score_matrix_python(
         for j in range(coords_2.shape[0]):
             score_matrix[i, j] = score_function(coords_1[i], coords_2[j])
     if normalized:
-        return utility.normalize(score_matrix)
+        return normalize(score_matrix)
     else:
         return score_matrix
 
@@ -77,7 +88,7 @@ def make_score_matrix(
         for j in range(coords_2.shape[0]):
             score_matrix[i, j] = score_function(coords_1[i], coords_2[j])
     if normalized:
-        return utility.normalize(score_matrix)
+        return normalize(score_matrix)
     else:
         return score_matrix
 
