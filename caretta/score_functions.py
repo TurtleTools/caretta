@@ -27,7 +27,9 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
     return np.sqrt(np.sum((coords_1 - coords_2) ** 2) / coords_1.shape[0])
 
 
-def make_score_matrix_python(coords_1: np.ndarray, coords_2: np.ndarray, score_function, normalized=False) -> np.ndarray:
+def make_score_matrix_python(
+    coords_1: np.ndarray, coords_2: np.ndarray, score_function, normalized=False
+) -> np.ndarray:
     """
     Makes matrix of scores of each coordinate in coords_1 to each coordinate in coords_2
     Parameters
@@ -53,7 +55,9 @@ def make_score_matrix_python(coords_1: np.ndarray, coords_2: np.ndarray, score_f
 
 
 @nb.njit
-def make_score_matrix(coords_1: np.ndarray, coords_2: np.ndarray, score_function, normalized=False) -> np.ndarray:
+def make_score_matrix(
+    coords_1: np.ndarray, coords_2: np.ndarray, score_function, normalized=False
+) -> np.ndarray:
     """
     Makes matrix of scores of each coordinate in coords_1 to each coordinate in coords_2
     Parameters
@@ -79,7 +83,9 @@ def make_score_matrix(coords_1: np.ndarray, coords_2: np.ndarray, score_function
 
 
 @nb.njit
-def get_total_score(coords_1: np.ndarray, coords_2: np.ndarray, score_function, normalized=False) -> float:
+def get_total_score(
+    coords_1: np.ndarray, coords_2: np.ndarray, score_function, normalized=False
+) -> float:
     """
     Get total score for a set of paired coordinates
 
@@ -120,6 +126,20 @@ def get_common_positions(aln_array_1, aln_array_2, gap=-1):
     -------
     common_positions_1, common_positions_2
     """
-    pos_1 = np.array([aln_array_1[i] for i in range(len(aln_array_1)) if aln_array_1[i] != gap and aln_array_2[i] != gap], dtype=np.int64)
-    pos_2 = np.array([aln_array_2[i] for i in range(len(aln_array_2)) if aln_array_1[i] != gap and aln_array_2[i] != gap], dtype=np.int64)
+    pos_1 = np.array(
+        [
+            aln_array_1[i]
+            for i in range(len(aln_array_1))
+            if aln_array_1[i] != gap and aln_array_2[i] != gap
+        ],
+        dtype=np.int64,
+    )
+    pos_2 = np.array(
+        [
+            aln_array_2[i]
+            for i in range(len(aln_array_2))
+            if aln_array_1[i] != gap and aln_array_2[i] != gap
+        ],
+        dtype=np.int64,
+    )
     return pos_1, pos_2

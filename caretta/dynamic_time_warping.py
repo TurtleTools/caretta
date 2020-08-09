@@ -1,12 +1,15 @@
 import numba as nb
 import numpy as np
+
 MIN_FLOAT64 = np.finfo(np.float64).min
 
 
 @nb.njit(cache=False)
-def _make_dtw_matrix(score_matrix: np.ndarray,
-                     gap_open_penalty: float = 0.,
-                     gap_extend_penalty: float = 0.):
+def _make_dtw_matrix(
+    score_matrix: np.ndarray,
+    gap_open_penalty: float = 0.0,
+    gap_extend_penalty: float = 0.0,
+):
     """
     Make cost matrix using dynamic time warping
 
@@ -45,21 +48,33 @@ def _make_dtw_matrix(score_matrix: np.ndarray,
 
     for i in range(1, n + 1):
         for j in range(1, m + 1):
-            scores_lower = np.array([matrix[i - 1, j, 0] + gap_extend_penalty,
-                                     matrix[i - 1, j, 1] + gap_open_penalty])
+            scores_lower = np.array(
+                [
+                    matrix[i - 1, j, 0] + gap_extend_penalty,
+                    matrix[i - 1, j, 1] + gap_open_penalty,
+                ]
+            )
             index_lower = np.argmax(scores_lower)
             matrix[i, j, 0] = scores_lower[index_lower]
             backtrack[i, j, 0] = index_lower
 
-            scores_upper = np.array([matrix[i, j - 1, 1] + gap_open_penalty,
-                                     matrix[i, j - 1, 2] + gap_extend_penalty])
+            scores_upper = np.array(
+                [
+                    matrix[i, j - 1, 1] + gap_open_penalty,
+                    matrix[i, j - 1, 2] + gap_extend_penalty,
+                ]
+            )
             index_upper = np.argmax(scores_upper)
             matrix[i, j, 2] = scores_upper[index_upper]
             backtrack[i, j, 2] = index_upper + 1
 
-            scores = np.array([matrix[i, j, 0],
-                               matrix[i - 1, j - 1, 1] + score_matrix[i - 1, j - 1],
-                               matrix[i, j, 2]])
+            scores = np.array(
+                [
+                    matrix[i, j, 0],
+                    matrix[i - 1, j - 1, 1] + score_matrix[i - 1, j - 1],
+                    matrix[i, j, 2],
+                ]
+            )
             index = np.argmax(scores)
             matrix[i, j, 1] = scores[index]
             backtrack[i, j, 1] = index
@@ -125,7 +140,11 @@ def _get_dtw_alignment(start_direction, backtrack: np.ndarray, n1, m1):
 
 
 @nb.njit
-def dtw_align(score_matrix: np.ndarray, gap_open_penalty: float = 0., gap_extend_penalty: float = 0.):
+def dtw_align(
+    score_matrix: np.ndarray,
+    gap_open_penalty: float = 0.0,
+    gap_extend_penalty: float = 0.0,
+):
     """
     Align two objects using dynamic time warping
 
@@ -141,7 +160,9 @@ def dtw_align(score_matrix: np.ndarray, gap_open_penalty: float = 0., gap_extend
     -------
     aligned_indices_1, aligned_indices_2
     """
-    matrix, backtrack = _make_dtw_matrix(score_matrix, gap_open_penalty, gap_extend_penalty)
+    matrix, backtrack = _make_dtw_matrix(
+        score_matrix, gap_open_penalty, gap_extend_penalty
+    )
     n = score_matrix.shape[0]
     m = score_matrix.shape[1]
     scores = np.array([matrix[n, m, 0], matrix[n, m, 1], matrix[n, m, 2]])

@@ -9,7 +9,7 @@ import prody as pd
 
 
 def secondary_to_array(secondary):
-    return np.array(secondary, dtype='S1').view(np.int8)
+    return np.array(secondary, dtype="S1").view(np.int8)
 
 
 def aligned_string_to_array(aln: str) -> np.ndarray:
@@ -27,7 +27,7 @@ def aligned_string_to_array(aln: str) -> np.ndarray:
     aln_array = np.zeros(len(aln), dtype=np.int64)
     i = 0
     for j in range(len(aln)):
-        if aln[j] != '-':
+        if aln[j] != "-":
             aln_array[j] = i
             i += 1
         else:
@@ -51,8 +51,22 @@ def get_common_positions(aln_array_1, aln_array_2, gap=-1):
     -------
     common_positions_1, common_positions_2
     """
-    pos_1 = np.array([aln_array_1[i] for i in range(len(aln_array_1)) if aln_array_1[i] != gap and aln_array_2[i] != gap], dtype=np.int64)
-    pos_2 = np.array([aln_array_2[i] for i in range(len(aln_array_2)) if aln_array_1[i] != gap and aln_array_2[i] != gap], dtype=np.int64)
+    pos_1 = np.array(
+        [
+            aln_array_1[i]
+            for i in range(len(aln_array_1))
+            if aln_array_1[i] != gap and aln_array_2[i] != gap
+        ],
+        dtype=np.int64,
+    )
+    pos_2 = np.array(
+        [
+            aln_array_2[i]
+            for i in range(len(aln_array_2))
+            if aln_array_1[i] != gap and aln_array_2[i] != gap
+        ],
+        dtype=np.int64,
+    )
     return pos_1, pos_2
 
 
@@ -115,7 +129,7 @@ def get_alpha_indices(protein):
     """
     Get indices of alpha carbons of pd AtomGroup object
     """
-    return [a.getIndex() for a in protein.iterAtoms() if a.getName() == 'CA']
+    return [a.getIndex() for a in protein.iterAtoms() if a.getName() == "CA"]
 
 
 def get_beta_indices(protein: pd.AtomGroup) -> list:
@@ -130,9 +144,9 @@ def get_beta_indices(protein: pd.AtomGroup) -> list:
         ca = None
         cb = None
         for _ in split:
-            if protein[i].getName() == 'CB':
+            if protein[i].getName() == "CB":
                 cb = protein[i].getIndex()
-            if protein[i].getName() == 'CA':
+            if protein[i].getName() == "CA":
                 ca = protein[i].getIndex()
             i += 1
         if cb is not None:
@@ -170,7 +184,9 @@ def group_indices(input_list: list) -> list:
     return output_list
 
 
-def clustal_msa_from_sequences(sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None):
+def clustal_msa_from_sequences(
+    sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None
+):
     """
     Align sequences optionally using hmm_file as a guide
 
@@ -188,13 +204,16 @@ def clustal_msa_from_sequences(sequence_file, alignment_file, hmm_file=None, dis
     """
     if hmm_file is not None:
         if distance_matrix_file is None:
-            subprocess.check_call(f"clustalo "
-                                  f"--output-order=input-order "
-                                  f"--log=log_clustal.out "
-                                  f"-i {sequence_file} "
-                                  f"--hmm-in={hmm_file} "
-                                  f"-o {alignment_file} "
-                                  f"--threads=10 --force -v", shell=True)
+            subprocess.check_call(
+                f"clustalo "
+                f"--output-order=input-order "
+                f"--log=log_clustal.out "
+                f"-i {sequence_file} "
+                f"--hmm-in={hmm_file} "
+                f"-o {alignment_file} "
+                f"--threads=10 --force -v",
+                shell=True,
+            )
         else:
             subprocess.check_call(
                 f"clustalo "
@@ -205,7 +224,8 @@ def clustal_msa_from_sequences(sequence_file, alignment_file, hmm_file=None, dis
                 f"--hmm-in={hmm_file} "
                 f"-o {alignment_file} "
                 f"--threads=10 --force -v",
-                shell=True)
+                shell=True,
+            )
     else:
         if distance_matrix_file is None:
             subprocess.check_call(
@@ -215,7 +235,8 @@ def clustal_msa_from_sequences(sequence_file, alignment_file, hmm_file=None, dis
                 f"-i {sequence_file} "
                 f"-o {alignment_file} "
                 f"--threads=10 --force -v",
-                shell=True)
+                shell=True,
+            )
         else:
             subprocess.check_call(
                 f"clustalo "
@@ -226,10 +247,13 @@ def clustal_msa_from_sequences(sequence_file, alignment_file, hmm_file=None, dis
                 f"-i {sequence_file} "
                 f"-o {alignment_file} "
                 f"--threads=10 --force -v",
-                shell=True)
+                shell=True,
+            )
 
 
-def get_sequences_from_fasta(fasta_file: typing.Union[str, Path], prune_headers: bool = True) -> dict:
+def get_sequences_from_fasta(
+    fasta_file: typing.Union[str, Path], prune_headers: bool = True
+) -> dict:
     """
     Returns dict of accession to sequence from fasta file
     Parameters
@@ -249,14 +273,14 @@ def get_sequences_from_fasta(fasta_file: typing.Union[str, Path], prune_headers:
         for line in f:
             if not len(line.strip()):
                 continue
-            if line.startswith('>'):
+            if line.startswith(">"):
                 if current_key is None:
                     if "/" in line and prune_headers:
                         current_key = line.split(">")[1].split("/")[0].strip()
                     else:
                         current_key = line.split(">")[1].strip()
                 else:
-                    sequences[current_key] = ''.join(current_sequence)
+                    sequences[current_key] = "".join(current_sequence)
                     current_sequence = []
                     if "/" in line and prune_headers:
                         current_key = line.split(">")[1].split("/")[0].strip()
@@ -264,7 +288,7 @@ def get_sequences_from_fasta(fasta_file: typing.Union[str, Path], prune_headers:
                         current_key = line.split(">")[1].strip()
             else:
                 current_sequence.append(line.strip())
-        sequences[current_key] = ''.join(current_sequence)
+        sequences[current_key] = "".join(current_sequence)
     return sequences
 
 
@@ -289,9 +313,9 @@ def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
     structure = Bio.PDB.PDBParser().get_structure(name, input_file)
     if chain is not None:
         structure = structure[0][chain]
-    residues = Bio.PDB.Selection.unfold_entities(structure, 'R')
+    residues = Bio.PDB.Selection.unfold_entities(structure, "R")
     peptides = Bio.PDB.PPBuilder().build_peptides(structure)
-    sequence = ''.join([str(peptide.get_sequence()) for peptide in peptides])
+    sequence = "".join([str(peptide.get_sequence()) for peptide in peptides])
     residue_dict = dict(zip(residues, range(len(residues))))
     seq_to_res_index = [residue_dict[r] for peptide in peptides for r in peptide]
     return structure, residues, peptides, sequence, seq_to_res_index
@@ -301,7 +325,7 @@ def get_alpha_coordinates(residue) -> np.ndarray:
     """
     Returns alpha coordinates of BioPython residue object
     """
-    return np.array(residue['CA'].get_coord())
+    return np.array(residue["CA"].get_coord())
 
 
 def get_beta_coordinates(residue) -> np.ndarray:
@@ -309,6 +333,44 @@ def get_beta_coordinates(residue) -> np.ndarray:
     Returns beta coordinates of BioPython residue object
     (alpha if Gly)
     """
-    if residue.get_resname() == "GLY" or 'CB' not in residue:
+    if residue.get_resname() == "GLY" or "CB" not in residue:
         return get_alpha_coordinates(residue)
-    return np.array(residue['CB'].get_coord())
+    return np.array(residue["CB"].get_coord())
+
+
+def parse_pdb_files(input_pdb, extension=".pdb"):
+    if type(input_pdb) == str or type(input_pdb) == Path:
+        input_pdb = Path(input_pdb)
+        if input_pdb.is_dir():
+            pdb_files = list(input_pdb.glob(f"*{extension}"))
+        elif input_pdb.is_file():
+            with open(input_pdb) as f:
+                pdb_files = f.read().strip().split("\n")
+        else:
+            pdb_files = str(input_pdb).split("\n")
+    else:
+        pdb_files = list(input_pdb)
+        if not Path(pdb_files[0]).is_file():
+            pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
+    print(f"Found {len(pdb_files)} PDB files")
+    return pdb_files
+
+
+def parse_pdb_files_and_clean(
+    input_pdb: str,
+    extension=".pdb",
+    output_pdb: typing.Union[str, Path] = "./cleaned_pdb",
+) -> typing.List[typing.Union[str, Path]]:
+    if not Path(output_pdb).exists():
+        Path(output_pdb).mkdir()
+    pdb_files = parse_pdb_files(input_pdb, extension)
+    output_pdb_files = []
+    for pdb_file in pdb_files:
+        pdb = pd.parsePDB(pdb_file).select("protein")
+        chains = pdb.getChids()
+        if len(chains) and len(chains[0].strip()):
+            pdb = pdb.select(f"chain {chains[0]}")
+        output_pdb_file = str(Path(output_pdb) / f"{Path(pdb_file).stem}.pdb")
+        pd.writePDB(output_pdb_file, pdb)
+        output_pdb_files.append(output_pdb_file)
+    return output_pdb_files
