@@ -53,7 +53,9 @@ def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
 
 @nb.njit
 # @numba_cc.export('apply_rotran', '(f64[:], f64[:], f64[:])')
-def apply_rotran(coords: np.ndarray, rotation_matrix: np.ndarray, translation_matrix: np.ndarray) -> np.ndarray:
+def apply_rotran(
+    coords: np.ndarray, rotation_matrix: np.ndarray, translation_matrix: np.ndarray
+) -> np.ndarray:
     """
     Applies a rotation and translation matrix onto coordinates
 
@@ -96,7 +98,9 @@ def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
 
 @nb.njit
 # @numba_cc.export('make_distance_matrix', '(f64[:], f64[:], f64, b1)')
-def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized=False) -> np.ndarray:
+def make_distance_matrix(
+    coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized=False
+) -> np.ndarray:
     """
     Makes matrix of euclidean distances of each coordinate in coords_1 to each coordinate in coords_2
     TODO: probably faster to do upper triangle += transpose
@@ -115,7 +119,9 @@ def make_distance_matrix(coords_1: np.ndarray, coords_2: np.ndarray, gamma, norm
     distance_matrix = np.zeros((coords_1.shape[0], coords_2.shape[0]))
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
-            distance_matrix[i, j] = np.exp(-gamma * np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1))
+            distance_matrix[i, j] = np.exp(
+                -gamma * np.sum((coords_1[i] - coords_2[j]) ** 2, axis=-1)
+            )
     if normalized:
         return normalize(distance_matrix)
     else:
@@ -133,7 +139,9 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
 
 @nb.njit
 # @numba_cc.export('get_caretta_score', '(f64[:], f64[:], f64, b1)')
-def get_caretta_score(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized) -> float:
+def get_caretta_score(
+    coords_1: np.ndarray, coords_2: np.ndarray, gamma, normalized
+) -> float:
     """
     Get caretta score for a a set of paired coordinates
 
@@ -150,12 +158,8 @@ def get_caretta_score(coords_1: np.ndarray, coords_2: np.ndarray, gamma, normali
     """
     score = 0
     for i in range(coords_1.shape[0]):
-        score += np.exp(
-            -gamma * np.sum((coords_1[i] - coords_2[i]) ** 2, axis=-1))
+        score += np.exp(-gamma * np.sum((coords_1[i] - coords_2[i]) ** 2, axis=-1))
     if normalized:
         return score / coords_1.shape[0]
     else:
         return score
-
-
-
