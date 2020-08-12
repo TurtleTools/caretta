@@ -1,4 +1,6 @@
-# Caretta
+<p align="center"><img src="caretta_logo.png" width="300" title="Caretta Logo"></p>
+
+# Caretta – A multiple protein structure alignment and feature extraction suite
 
 Caretta is a software-suite to perform multiple protein structure alignment and structure feature extraction.
 
@@ -63,3 +65,6 @@ caretta-cli input_pdb_folder
 caretta-app <host-ip> <port> 
 # e.g. caretta-app localhost 8091
 ```
+
+## Publications
+Akdel, Mehmet, Janani Durairaj, Dick de Ridder, and Aalt DJ van Dijk. "Caretta-A Multiple Protein Structure Alignment and Feature Extraction Suite." Computational and Structural Biotechnology Journal (2020). (https://doi.org/10.1016/j.csbj.2020.03.011)
