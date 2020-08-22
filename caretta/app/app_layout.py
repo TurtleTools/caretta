@@ -11,12 +11,21 @@ box_style = {
 }
 
 
-def get_layout(introduction_text, input_text, placeholder_text, selection_text, suite, pfam_class=None):
+def get_layout(
+    introduction_text,
+    input_text,
+    placeholder_text,
+    selection_text,
+    suite,
+    pfam_class=None,
+):
     return html.Div(
         children=[
             get_introduction_panel(introduction_text),
             html.Br(),
-            get_input_panel_layout(input_text, placeholder_text, selection_text, pfam_class),
+            get_input_panel_layout(
+                input_text, placeholder_text, selection_text, pfam_class
+            ),
             html.Br(),
             get_hidden_variables_layout(suite),
             get_sequence_alignment_layout(),
@@ -76,19 +85,25 @@ def get_hidden_variables_layout(suite):
     )
 
 
-def get_input_panel_layout(input_text: str, placeholder_text: str, selection_text: str, pfam_class: app_helper.PfamToPDB = None):
+def get_input_panel_layout(
+    input_text: str,
+    placeholder_text: str,
+    selection_text: str,
+    pfam_class: app_helper.PfamToPDB = None,
+):
     if pfam_class is not None:
-        user_input = dcc.Dropdown(placeholder="Choose Pfam ID",
-                                  options=[{"label": x, "value": x} for x in pfam_class.pfam_to_pdb_ids],
-                                  id="user-input")
+        user_input = dcc.Dropdown(
+            placeholder="Choose Pfam ID",
+            options=[{"label": x, "value": x} for x in pfam_class.pfam_to_pdb_ids],
+            id="user-input",
+        )
 
     else:
-        user_input = dcc.Textarea(
-                                    placeholder=placeholder_text,
-                                    value="",
-                                    id="user-input",
-                                    required=True,
-                                ),
+        user_input = (
+            dcc.Textarea(
+                placeholder=placeholder_text, value="", id="user-input", required=True,
+            ),
+        )
     return html.Div(
         [
             html.Div(
@@ -102,10 +117,7 @@ def get_input_panel_layout(input_text: str, placeholder_text: str, selection_tex
                     html.P(input_text, className="row",),
                     html.Div(
                         [
-                            html.Div(
-                                user_input,
-                                className="four columns",
-                            ),
+                            html.Div(user_input, className="four columns",),
                             html.P(
                                 dcc.Markdown(selection_text), className="four columns"
                             ),
@@ -287,8 +299,7 @@ def get_feature_alignment_panel():
                     html.Div(
                         [
                             html.Div(
-                                get_export_feature_buttons(),
-                                id="feature-exporter",
+                                get_export_feature_buttons(), id="feature-exporter",
                             ),
                             html.Div(html.P(""), id="feature-download-link"),
                             html.Br(),
@@ -301,7 +312,7 @@ def get_feature_alignment_panel():
                 html.Div(
                     dcc.Graph(figure=app_helper.empty_dict(), id="feature-line-graph",),
                     id="feature-line",
-                    className="twelve columns"
+                    className="twelve columns",
                 ),
                 className="row",
             ),
@@ -311,7 +322,7 @@ def get_feature_alignment_panel():
                         figure=app_helper.empty_dict(), id="feature-heatmap-graph",
                     ),
                     id="feature-heatmap",
-                    className="twelve columns"
+                    className="twelve columns",
                 ),
                 className="row",
             ),
@@ -324,24 +335,32 @@ def get_feature_alignment_panel():
 def get_export_feature_buttons():
     return [
         html.Div(
-            html.Button("Download feature as tab-separated file",
-                        id="export-feature-button",
-                        className="twelve columns"),
-            className="row"
+            html.Button(
+                "Download feature as tab-separated file",
+                id="export-feature-button",
+                className="twelve columns",
+            ),
+            className="row",
         ),
         html.Br(),
         html.Div(
-            html.Button("Download all features",
-                        id="export-all-features-button",
-                        className="twelve columns"),
-            className="row"
+            html.Button(
+                "Download all features",
+                id="export-all-features-button",
+                className="twelve columns",
+            ),
+            className="row",
         ),
-        html.Br()
+        html.Br(),
     ]
 
 
 def get_download_string(filename):
-    return html.Div(html.A(f"Download {Path(filename).stem}{Path(filename).suffix} here",
-                           href=f"/caretta/{filename}",
-                           className="twelve columns"),
-                    className="container")
+    return html.Div(
+        html.A(
+            f"Download {Path(filename).stem}{Path(filename).suffix} here",
+            href=f"/caretta/{filename}",
+            className="twelve columns",
+        ),
+        className="container",
+    )

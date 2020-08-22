@@ -69,7 +69,6 @@ def register_callbacks(app, get_pdb_entries, suite):
             dash.dependencies.Output("sequence-alignment-data", "children"),
             # aligned feature dict
             dash.dependencies.Output("feature-alignment-data", "children"),
-
             # sequence alignment panel
             dash.dependencies.Output("sequence-alignment", "children"),
             # structure alignment panel
@@ -463,9 +462,7 @@ def register_callbacks(app, get_pdb_entries, suite):
                 write_class=False,
                 write_features=False,
             )
-            return app_layout.get_download_string(
-                str(Path("static") / "result.fasta"),
-            )
+            return app_layout.get_download_string(str(Path("static") / "result.fasta"),)
         else:
             return ""
 
@@ -509,7 +506,9 @@ def register_callbacks(app, get_pdb_entries, suite):
             for pdb_file in (Path(msa_class.output_folder) / "superposed_pdbs").glob(
                 "*.pdb"
             ):
-                pdb_zip_file.write(str(pdb_file), arcname=f"{pdb_file.stem}{pdb_file.suffix}")
+                pdb_zip_file.write(
+                    str(pdb_file), arcname=f"{pdb_file.stem}{pdb_file.suffix}"
+                )
             return app_layout.get_download_string(output_filename)
         else:
             return ""
@@ -559,27 +558,27 @@ def register_callbacks(app, get_pdb_entries, suite):
             ) and not export_all_features_button_clicked:
                 output_filename = f"{msa_class.output_folder}/{'-'.join(feature_selection_dropdown_value.split())}.csv"
                 app_helper.write_feature_as_tsv(
-                    feature_alignment_dict[
-                        feature_selection_dropdown_value
-                    ], protein_names, output_filename
+                    feature_alignment_dict[feature_selection_dropdown_value],
+                    protein_names,
+                    output_filename,
                 )
-                output_string = app_layout.get_download_string(
-                    output_filename
-                )
+                output_string = app_layout.get_download_string(output_filename)
             elif (
                 export_all_features_button_clicked and not export_feature_button_clicked
             ):
                 output_filename = f"{msa_class.output_folder}/features.zip"
                 features_zip_file = ZipFile(output_filename, mode="w")
                 for feature in feature_alignment_dict:
-                    feature_file = f"{msa_class.output_folder}/{'-'.join(feature.split())}.csv"
+                    feature_file = (
+                        f"{msa_class.output_folder}/{'-'.join(feature.split())}.csv"
+                    )
                     app_helper.write_feature_as_tsv(
                         feature_alignment_dict[feature], protein_names, feature_file
                     )
-                    features_zip_file.write(str(feature_file), arcname=f"{'-'.join(feature.split())}.csv")
-                output_string = app_layout.get_download_string(
-                    output_filename
-                )
+                    features_zip_file.write(
+                        str(feature_file), arcname=f"{'-'.join(feature.split())}.csv"
+                    )
+                output_string = app_layout.get_download_string(output_filename)
         return output_string, app_layout.get_export_feature_buttons()
 
     @app.server.route("/caretta/static/<path:path>")
