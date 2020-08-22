@@ -724,12 +724,12 @@ class StructureMultiple:
         if alignment is None:
             alignment = self.make_sequence_alignment()
 
-        pdb_files = [self.output_folder / "cleaned_pdb" / f"{s.name}.pdb" for s in self.structures]
+        pdb_files = [
+            self.output_folder / "cleaned_pdb" / f"{s.name}.pdb"
+            for s in self.structures
+        ]
         features = feature_extraction.get_features_multiple(
-            pdb_files,
-            str(dssp_dir),
-            num_threads=num_threads,
-            force_overwrite=True
+            pdb_files, str(dssp_dir), num_threads=num_threads, force_overwrite=True
         )
         feature_names = list(features[0].keys())
         aligned_features = {}
