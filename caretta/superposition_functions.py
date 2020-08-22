@@ -195,9 +195,7 @@ def _align_and_superpose(
     dtw_aln_array_1, dtw_aln_array_2, score = dtw.dtw_align(
         score_matrix, gap_open_penalty, gap_extend_penalty
     )
-    pos_1, pos_2 = score_functions.get_common_positions(
-        dtw_aln_array_1, dtw_aln_array_2
-    )
+    pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
     common_coords_1, common_coords_2 = coords_1[pos_1], coords_2[pos_2]
     coords_1, coords_2, common_coords_2 = paired_svd_superpose_with_subset(
         coords_1, coords_2, common_coords_1, common_coords_2
@@ -302,7 +300,7 @@ def _signal_superpose_index(
     dtw_1, dtw_2, score = dtw.dtw_align(
         score_matrix, gap_open_penalty, gap_extend_penalty
     )
-    pos_1, pos_2 = score_functions.get_common_positions(dtw_1, dtw_2)
+    pos_1, pos_2 = helper.get_common_positions(dtw_1, dtw_2)
     aln_coords_1 = np.zeros((len(pos_1), coords_1.shape[1]))
     aln_coords_2 = np.zeros((len(pos_2), coords_2.shape[1]))
     for i, (p1, p2) in enumerate(zip(pos_1, pos_2)):
