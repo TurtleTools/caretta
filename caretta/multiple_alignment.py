@@ -154,6 +154,7 @@ class StructureMultiple:
         write_fasta: bool = False,
         write_pdb: bool = False,
         write_features: bool = False,
+        only_dssp: bool = True,
         write_class: bool = False,
     ):
         """
@@ -190,6 +191,9 @@ class StructureMultiple:
         write_features
             True => extracts and writes aligned features as a dictionary of numpy arrays into a pickle file (default True)
             writes to output_folder / result_features.pkl
+        only_dssp
+            True => only DSSP features extracted
+            False => all features
         write_class
             True => writes StructureMultiple class with intermediate structures and tree to pickle file (default True)
             writes to output_folder / result_class.pkl
@@ -219,7 +223,7 @@ class StructureMultiple:
             )
 
         msa_class.write_files(
-            write_fasta, write_pdb, write_features, write_class, num_threads,
+            write_fasta, write_pdb, write_features, write_class, num_threads, only_dssp=only_dssp
         )
         return msa_class
 
@@ -607,7 +611,7 @@ class StructureMultiple:
         return sequence_alignment
 
     def write_files(
-        self, write_fasta, write_pdb, write_features, write_class, num_threads=4,
+        self, write_fasta, write_pdb, write_features, write_class, only_dssp=True, num_threads=4,
     ):
         if any((write_fasta, write_pdb, write_pdb, write_class)):
             typer.echo("Writing files...")
@@ -630,7 +634,7 @@ class StructureMultiple:
             if not dssp_dir.exists():
                 dssp_dir.mkdir()
             feature_file = self.output_folder / "result_features.pkl"
-            self.features = self.get_aligned_features(str(dssp_dir), num_threads)
+            self.features = self.get_aligned_features(str(dssp_dir), only_dssp=only_dssp, num_threads=num_threads)
             with open(feature_file, "wb") as f:
                 pickle.dump(self.features, f)
             typer.echo(
@@ -716,7 +720,8 @@ class StructureMultiple:
             pd.writePDB(str(output_pdb_folder / f"{name}.pdb"), pdb)
 
     def get_aligned_features(
-        self, dssp_dir, num_threads, alignment: dict = None
+        self, dssp_dir, num_threads, alignment: dict = None,
+             only_dssp: bool = True
     ) -> typing.Dict[str, np.ndarray]:
         """
         Get dict of aligned features
@@ -729,7 +734,7 @@ class StructureMultiple:
             for s in self.structures
         ]
         features = feature_extraction.get_features_multiple(
-            pdb_files, str(dssp_dir), num_threads=num_threads, force_overwrite=True
+            pdb_files, str(dssp_dir), num_threads=num_threads, only_dssp=only_dssp, force_overwrite=True
         )
         feature_names = list(features[0].keys())
         aligned_features = {}

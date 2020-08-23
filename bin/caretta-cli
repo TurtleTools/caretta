@@ -69,6 +69,11 @@ def align(
         "--features",
         help="extract and write aligned features as a dictionary of NumPy arrays into a pickle file",
     ),
+    only_dssp: bool = typer.Option(
+        False,
+        "--only-dssp",
+        help="extract only DSSP features"
+    ),
     write_class: bool = typer.Option(
         False,
         "--class",
@@ -95,6 +100,7 @@ def align(
         fasta,
         pdb,
         features,
+        only_dssp,
         write_class,
     )
 
