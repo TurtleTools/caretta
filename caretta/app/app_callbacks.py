@@ -463,7 +463,7 @@ def register_callbacks(app, get_pdb_entries, suite):
                 write_features=False,
             )
             return app_layout.get_download_string(
-                str(msa_class.output_folder / "result.fasta")
+                str(Path(msa_class.output_folder) / "result.fasta")
             )
         else:
             return ""
