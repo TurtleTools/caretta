@@ -1,7 +1,6 @@
 import subprocess
-import typing
-from pathlib import Path
-
+from typing import List, Union, Tuple
+from pathlib import Path, PosixPath
 import Bio.PDB
 import numba as nb
 import numpy as np
@@ -12,40 +11,15 @@ def secondary_to_array(secondary):
     return np.array(secondary, dtype="S1").view(np.int8)
 
 
-def aligned_string_to_array(aln: str) -> np.ndarray:
-    """
-    Aligned sequence to array of indices with gaps as -1
-
-    Parameters
-    ----------
-    aln
-
-    Returns
-    -------
-    indices
-    """
-    aln_array = np.zeros(len(aln), dtype=np.int64)
-    i = 0
-    for j in range(len(aln)):
-        if aln[j] != "-":
-            aln_array[j] = i
-            i += 1
-        else:
-            aln_array[j] = -1
-    return aln_array
-
-
 @nb.njit
-# @numba_cc.export('get_common_positions', '(i64[:], i64[:], i64)')
-def get_common_positions(aln_array_1, aln_array_2, gap=-1):
+def get_common_positions(aln_array_1, aln_array_2):
     """
-    Return positions where neither alignment has a gap
+    Return positions where neither alignment has a gap (-1)
 
     Parameters
     ----------
     aln_array_1
     aln_array_2
-    gap
 
     Returns
     -------
@@ -55,7 +29,7 @@ def get_common_positions(aln_array_1, aln_array_2, gap=-1):
         [
             aln_array_1[i]
             for i in range(len(aln_array_1))
-            if aln_array_1[i] != gap and aln_array_2[i] != gap
+            if aln_array_1[i] != -1 and aln_array_2[i] != -1
         ],
         dtype=np.int64,
     )
@@ -63,7 +37,7 @@ def get_common_positions(aln_array_1, aln_array_2, gap=-1):
         [
             aln_array_2[i]
             for i in range(len(aln_array_2))
-            if aln_array_1[i] != gap and aln_array_2[i] != gap
+            if aln_array_1[i] != -1 and aln_array_2[i] != -1
         ],
         dtype=np.int64,
     )
@@ -71,43 +45,23 @@ def get_common_positions(aln_array_1, aln_array_2, gap=-1):
 
 
 @nb.njit
-# @numba_cc.export('get_aligned_data', '(i64[:], f64[:], i64)')
-def get_aligned_data(aln_array: np.ndarray, data: np.ndarray, gap=-1):
+def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
     """
-    Fills coordinates according to an alignment
-    gaps (-1) in the sequence correspond to NaNs in the aligned coordinates
-
-    Parameters
-    ----------
-    aln_array
-        sequence (with gaps)
-    data
-        data to align
-    gap
-        character that represents gaps
-    Returns
-    -------
-    aligned coordinates
+    Same as np.mean(array, axis=0) but njitted
     """
-    pos = np.array([i for i in range(len(aln_array)) if aln_array[i] != gap])
-    assert len(pos) == data.shape[0]
-    aln_coords = np.zeros((len(aln_array), data.shape[1]))
-    aln_coords[:] = np.nan
-    aln_coords[pos] = data
-    return aln_coords
+    mean_array = np.zeros(array.shape[1])
+    for i in range(array.shape[1]):
+        mean_array[i] = np.mean(array[:, i])
+    return mean_array
 
 
 @nb.njit
-# @numba_cc.export('get_aligned_string_data', '(i64[:], i8[:], i64)')
-def get_aligned_string_data(aln_array, data, gap=-1):
-    pos = np.array([i for i in range(len(aln_array)) if aln_array[i] != gap])
-    assert len(pos) == data.shape[0]
-    aln_coords = np.zeros(aln_array.shape[0], dtype=data.dtype)
-    aln_coords[pos] = data
-    return aln_coords
+def normalize(numbers):
+    minv, maxv = np.min(numbers), np.max(numbers)
+    return (numbers - minv) / (maxv - minv)
 
 
-def get_file_parts(input_filename: typing.Union[str, Path]) -> tuple:
+def get_file_parts(input_filename: Union[str, Path]) -> Tuple[str, str, str]:
     """
     Gets directory path, name, and extension from a filename
     Parameters
@@ -125,14 +79,14 @@ def get_file_parts(input_filename: typing.Union[str, Path]) -> tuple:
     return path, name, extension
 
 
-def get_alpha_indices(protein):
+def get_alpha_indices(protein: pd.AtomGroup) -> List[int]:
     """
     Get indices of alpha carbons of pd AtomGroup object
     """
     return [a.getIndex() for a in protein.iterAtoms() if a.getName() == "CA"]
 
 
-def get_beta_indices(protein: pd.AtomGroup) -> list:
+def get_beta_indices(protein: pd.AtomGroup) -> List[int]:
     """
     Get indices of beta carbons of pd AtomGroup object
     (If beta carbon doesn't exist, alpha carbon index is returned)
@@ -157,7 +111,7 @@ def get_beta_indices(protein: pd.AtomGroup) -> list:
     return indices
 
 
-def group_indices(input_list: list) -> list:
+def group_indices(input_list: List[int]) -> List[List[int]]:
     """
     [1, 1, 1, 2, 2, 3, 3, 3, 4] -> [[0, 1, 2], [3, 4], [5, 6, 7], [8]]
     Parameters
@@ -252,7 +206,7 @@ def clustal_msa_from_sequences(
 
 
 def get_sequences_from_fasta(
-    fasta_file: typing.Union[str, Path], prune_headers: bool = True
+    fasta_file: Union[str, Path], prune_headers: bool = True
 ) -> dict:
     """
     Returns dict of accession to sequence from fasta file
@@ -338,11 +292,11 @@ def get_beta_coordinates(residue) -> np.ndarray:
     return np.array(residue["CB"].get_coord())
 
 
-def parse_pdb_files(input_pdb, extension=".pdb"):
-    if type(input_pdb) == str or type(input_pdb) == Path:
+def parse_pdb_files(input_pdb):
+    if type(input_pdb) == str or type(input_pdb) == PosixPath:
         input_pdb = Path(input_pdb)
         if input_pdb.is_dir():
-            pdb_files = list(input_pdb.glob(f"*{extension}"))
+            pdb_files = list(input_pdb.glob("*.pdb"))
         elif input_pdb.is_file():
             with open(input_pdb) as f:
                 pdb_files = f.read().strip().split("\n")
@@ -352,18 +306,15 @@ def parse_pdb_files(input_pdb, extension=".pdb"):
         pdb_files = list(input_pdb)
         if not Path(pdb_files[0]).is_file():
             pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
-    print(f"Found {len(pdb_files)} PDB files")
     return pdb_files
 
 
 def parse_pdb_files_and_clean(
-    input_pdb: str,
-    extension=".pdb",
-    output_pdb: typing.Union[str, Path] = "./cleaned_pdb",
-) -> typing.List[typing.Union[str, Path]]:
+    input_pdb: str, output_pdb: Union[str, Path] = "./cleaned_pdb",
+) -> List[Union[str, Path]]:
     if not Path(output_pdb).exists():
         Path(output_pdb).mkdir()
-    pdb_files = parse_pdb_files(input_pdb, extension)
+    pdb_files = parse_pdb_files(input_pdb)
     output_pdb_files = []
     for pdb_file in pdb_files:
         pdb = pd.parsePDB(pdb_file).select("protein")

@@ -6,9 +6,9 @@ from pathlib import Path
 import numba as nb
 import numpy as np
 import prody as pd
+import typer
+from geometricus import Structure, MomentInvariants, SplitType, GeometricusEmbedding
 from scipy.spatial.distance import pdist, squareform
-from geometricus import geometricus, protein_utility
-from geometricus.moment_utility import nb_mean_axis_0
 
 from caretta import (
     dynamic_time_warping as dtw,
@@ -20,13 +20,15 @@ from caretta import (
 )
 
 
-@nb.njit(cache=False)
-def get_common_coordinates(coords_1, coords_2, aln_1, aln_2, gap=-1):
+@nb.njit
+def get_common_coordinates(
+    coords_1: np.ndarray, coords_2: np.ndarray, aln_1: np.ndarray, aln_2: np.ndarray
+) -> typing.Tuple[np.ndarray, np.ndarray]:
     """
     Return coordinate positions aligned in both coords_1 and coords_2
     """
     assert aln_1.shape == aln_2.shape
-    pos_1, pos_2 = score_functions.get_common_positions(aln_1, aln_2, gap)
+    pos_1, pos_2 = helper.get_common_positions(aln_1, aln_2)
     return coords_1[pos_1], coords_2[pos_2]
 
 
@@ -53,23 +55,14 @@ def get_mean_coords(
     return mean_coords
 
 
-@nb.njit
-def get_pairwise_braycurtis(fingerprints):
-    res = np.zeros((fingerprints.shape[0], fingerprints.shape[0]), dtype=np.float64)
-    for i in range(fingerprints.shape[0]):
-        for j in range(fingerprints.shape[0]):
-            res[i, j] = np.sum(np.abs(fingerprints[i] - fingerprints[j])) / np.sum(
-                np.abs(fingerprints[i] + fingerprints[j])
-            )
-    return res
-
-
-def get_mean_weights(weights_1, weights_2, aln_1, aln_2, gap=-1):
+def get_mean_weights(
+    weights_1: np.ndarray, weights_2: np.ndarray, aln_1: np.ndarray, aln_2: np.ndarray
+) -> np.ndarray:
     mean_weights = np.zeros(aln_1.shape[0])
     for i, (x, y) in enumerate(zip(aln_1, aln_2)):
-        if not x == gap:
+        if not x == -1:
             mean_weights[i] += weights_1[x]
-        if not y == gap:
+        if not y == -1:
             mean_weights[i] += weights_2[y]
     return mean_weights
 
@@ -83,6 +76,18 @@ class OutputFiles:
     class_file: Path = Path("./result_class.pkl")
 
 
+DEFAULT_SUPERPOSITION_PARAMETERS = {
+    "num_split_types": 2,
+    "split_type_0": "KMER",
+    "split_size_0": 30,
+    "split_type_1": "RADIUS",
+    "split_size_1": 16,
+    "gap_open_penalty": 0.01,
+    "gap_extend_penalty": 0.001,
+    "scale": True,
+}
+
+
 @dataclass
 class StructureMultiple:
     """
@@ -92,6 +97,8 @@ class StructureMultiple:
     ---------------------
     structures
         list of protein_utility.Structure objects
+    superposition_parameters
+        dictionary of parameters to pass to the superposition function
     superposition_function
         a function that takes two coordinate sets as input and superposes them
         returns a score, superposed_coords_1, superposed_coords_2
@@ -108,8 +115,9 @@ class StructureMultiple:
         indices of aligning residues from each structure, gaps are -1s
     """
 
-    structures: typing.List[protein_utility.Structure]
+    structures: typing.List[Structure]
     sequences: typing.Dict[str, str]
+    superposition_parameters: typing.Dict[str, typing.Any]
     superposition_function: typing.Callable[
         [
             np.ndarray,
@@ -122,50 +130,53 @@ class StructureMultiple:
     score_function: typing.Callable[
         [np.ndarray, np.ndarray], float
     ] = score_functions.get_caretta_score
-    gamma: float = 0.3
     mean_function: typing.Callable[
         [np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray
     ] = get_mean_coords
     consensus_weight: float = 1.0
-    final_structures: typing.Union[None, typing.List[protein_utility.Structure]] = None
+    final_structures: typing.Union[None, typing.List[Structure]] = None
     final_consensus_weights: typing.Union[None, typing.List[np.ndarray]] = None
     tree: typing.Union[None, np.ndarray] = None
     branch_lengths: typing.Union[None, np.ndarray] = None
-    alignment: typing.Union[None, dict] = None
+    alignment: typing.Union[dict, None] = None
     output_folder: Path = Path("./caretta_results")
+    features: typing.Union[dict, None] = None
 
     @staticmethod
     def align_from_pdb_files(
-        input_pdb,
-        gap_open_penalty=1.0,
-        gap_extend_penalty=0.01,
-        consensus_weight=1.0,
-        output_folder=Path("../caretta_results"),
-        num_threads=20,
-        write_fasta=False,
-        write_pdb=False,
-        write_features=False,
-        write_class=False,
-        overwrite_dssp=False,
+        input_pdb: typing.Union[typing.List[str], Path, str],
+        gap_open_penalty: float = 1.0,
+        gap_extend_penalty: float = 0.01,
+        consensus_weight: float = 1.0,
+        full: bool = False,
+        output_folder: typing.Union[str, Path] = Path("../caretta_results"),
+        num_threads: int = 20,
+        write_fasta: bool = False,
+        write_pdb: bool = False,
+        write_features: bool = False,
+        write_class: bool = False,
     ):
         """
-        Caretta aligns protein structures and returns a sequence alignment, a set of aligned feature matrices, superposed PDB files, and
-        a class with intermediate structures made during progressive alignment.
+        Caretta aligns protein structures and can output a sequence alignment, superposed PDB files,
+        a set of aligned feature matrices and a class with intermediate structures made during progressive alignment.
+
         Parameters
         ----------
         input_pdb
             Can be \n
-            A list of PDB files
-            A list of PDB IDs
-            A folder with input protein files
-            A file which lists PDB filenames on each line
-            A file which lists PDB IDs on each line
+            A list of PDB files,
+            A list of PDB IDs,
+            A folder with input protein files,
+            A file which lists PDB filenames on each line,
+            A file which lists PDB IDs on each line,
         gap_open_penalty
             default 1
         gap_extend_penalty
             default 0.01
         consensus_weight
             default 1
+        full
+            True =>  Uses all-vs-all pairwise Caretta alignment to make the distance matrix (much slower)
         output_folder
             default "caretta_results"
         num_threads
@@ -182,8 +193,6 @@ class StructureMultiple:
         write_class
             True => writes StructureMultiple class with intermediate structures and tree to pickle file (default True)
             writes to output_folder / result_class.pkl
-        overwrite_dssp
-            Forces DSSP to rerun even if files are already present (default False)
 
         Returns
         -------
@@ -191,19 +200,26 @@ class StructureMultiple:
         """
         msa_class = StructureMultiple.from_pdb_files(
             input_pdb,
-            superposition_function=superposition_functions.moment_svd_superpose_function,
+            superposition_parameters=DEFAULT_SUPERPOSITION_PARAMETERS,
+            superposition_function=superposition_functions.moment_multiple_svd_superpose_function,
             consensus_weight=consensus_weight,
             output_folder=output_folder,
         )
-        pw_matrix = msa_class.make_pairwise_dtw_matrix()
-        msa_class.align(pw_matrix, gap_open_penalty, gap_extend_penalty)
+        if len(msa_class.structures) > 2:
+            if full:
+                pw_matrix = msa_class.make_pairwise_dtw_matrix(
+                    gap_open_penalty, gap_extend_penalty
+                )
+            else:
+                pw_matrix = msa_class.make_pairwise_shape_matrix()
+            msa_class.align(pw_matrix, gap_open_penalty, gap_extend_penalty)
+        else:
+            msa_class.align(
+                gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty
+            )
+
         msa_class.write_files(
-            write_fasta,
-            write_pdb,
-            write_features,
-            write_class,
-            num_threads,
-            overwrite_dssp,
+            write_fasta, write_pdb, write_features, write_class, num_threads,
         )
         return msa_class
 
@@ -211,7 +227,8 @@ class StructureMultiple:
     def from_pdb_files(
         cls,
         input_pdb,
-        superposition_function,
+        superposition_parameters,
+        superposition_function=superposition_functions.moment_multiple_svd_superpose_function,
         score_function=score_functions.get_caretta_score,
         consensus_weight=1.0,
         output_folder=Path("./caretta_results"),
@@ -223,6 +240,8 @@ class StructureMultiple:
         ----------
         input_pdb
             list of pdb files/names or a folder containing pdb files
+        superposition_parameters
+            parameters to give to the superposition function
         superposition_function
             a function that takes two coordinate sets as input and superposes them
             returns a score, superposed_coords_1, superposed_coords_2
@@ -244,24 +263,20 @@ class StructureMultiple:
         if not cleaned_pdb_folder.exists():
             cleaned_pdb_folder.mkdir()
         pdb_files = helper.parse_pdb_files_and_clean(input_pdb, cleaned_pdb_folder)
+        typer.echo(f"Found {len(pdb_files)} PDB files")
 
         structures = []
         sequences = {}
         for pdb_file in pdb_files:
             pdb_name = Path(pdb_file).stem
-            protein = pd.parsePDB(str(pdb_file)).select("protein")
-            indices = [
-                i for i, a in enumerate(protein.iterAtoms()) if a.getName() == "CA"
-            ]
-            protein = protein[indices]
+            protein = pd.parsePDB(str(pdb_file)).select("protein and calpha")
             coordinates = protein.getCoords()
-            structures.append(
-                protein_utility.Structure(pdb_name, coordinates.shape[0], coordinates)
-            )
+            structures.append(Structure(pdb_name, coordinates.shape[0], coordinates))
             sequences[pdb_name] = protein.getSequence()
         msa_class = StructureMultiple(
             structures,
             sequences,
+            superposition_parameters,
             superposition_function,
             score_function=score_function,
             consensus_weight=consensus_weight,
@@ -273,7 +288,6 @@ class StructureMultiple:
         self,
         coords_1,
         coords_2,
-        parameters,
         gap_open_penalty: float,
         gap_extend_penalty: float,
         weight=False,
@@ -287,7 +301,6 @@ class StructureMultiple:
         ----------
         coords_1
         coords_2
-        parameters
         gap_open_penalty
         gap_extend_penalty
         weight
@@ -299,11 +312,8 @@ class StructureMultiple:
         -------
         alignment_1, alignment_2, score, superposed_coords_1, superposed_coords_2
         """
-        #  if exclude_last:
-        #      _, coords_1[:, :-1], coords_2[:, :-1] = self.superposition_function(coords_1[:, :-1], coords_2[:, :-1])
-        #  else:
         _, coords_1, coords_2 = self.superposition_function(
-            coords_1, coords_2, parameters
+            coords_1, coords_2, self.superposition_parameters
         )
         if weight:
             assert weights_1 is not None
@@ -323,9 +333,7 @@ class StructureMultiple:
             score_matrix, gap_open_penalty, gap_extend_penalty
         )
         for i in range(n_iter):
-            pos_1, pos_2 = score_functions.get_common_positions(
-                dtw_aln_array_1, dtw_aln_array_2
-            )
+            pos_1, pos_2 = helper.get_common_positions(dtw_aln_array_1, dtw_aln_array_2)
             common_coords_1, common_coords_2 = coords_1[pos_1], coords_2[pos_2]
             (
                 c1,
@@ -353,7 +361,11 @@ class StructureMultiple:
         return dtw_aln_array_1, dtw_aln_array_2, dtw_score, coords_1, coords_2
 
     def make_pairwise_shape_matrix(
-        self, resolution: np.ndarray, kmer_size=30, radius=10, metric="braycurtis"
+        self,
+        resolution: typing.Union[float, np.ndarray] = 2.0,
+        kmer_size: int = 30,
+        radius: int = 16,
+        metric="braycurtis",
     ):
         """
         Makes an all vs. all matrix of distance scores between all the structures.
@@ -370,49 +382,47 @@ class StructureMultiple:
         -------
         [n x n] distance matrix
         """
-        kmer_invariants = [
-            geometricus.MomentInvariants.from_coordinates(
+        typer.echo("Calculating pairwise distances...")
+        kmer_invariants = (
+            MomentInvariants.from_coordinates(
                 s.name,
                 s.coordinates,
                 None,
                 split_size=kmer_size,
-                split_type=geometricus.SplitType.KMER,
+                split_type=SplitType.KMER,
             )
             for s in self.structures
-        ]
-        radius_invariants = [
-            geometricus.MomentInvariants.from_coordinates(
+        )
+        radius_invariants = (
+            MomentInvariants.from_coordinates(
                 s.name,
                 s.coordinates,
                 None,
                 split_size=radius,
-                split_type=geometricus.SplitType.RADIUS,
+                split_type=SplitType.RADIUS,
             )
             for s in self.structures
-        ]
-        kmer_embedder = geometricus.GeometricusEmbedding.from_invariants(
+        )
+        kmer_embedder = GeometricusEmbedding.from_invariants(
             kmer_invariants,
             resolution=resolution,
             protein_keys=[s.name for s in self.structures],
         )
-        radius_embedder = geometricus.GeometricusEmbedding.from_invariants(
+        radius_embedder = GeometricusEmbedding.from_invariants(
             radius_invariants,
             resolution=resolution,
             protein_keys=[s.name for s in self.structures],
         )
-        return squareform(
+        distance_matrix = squareform(
             pdist(
                 np.hstack((kmer_embedder.embedding, radius_embedder.embedding)),
                 metric=metric,
             )
         )
+        return distance_matrix
 
     def make_pairwise_dtw_matrix(
-        self,
-        parameters: dict,
-        gap_open_penalty: float,
-        gap_extend_penalty: float,
-        invert=True,
+        self, gap_open_penalty: float, gap_extend_penalty: float, invert=True,
     ):
         """
         Makes an all vs. all matrix of distance (or similarity) scores between all the structures using pairwise alignment.
@@ -429,6 +439,7 @@ class StructureMultiple:
         -------
         [n x n] matrix
         """
+        typer.echo("Calculating pairwise distances...")
         pairwise_matrix = np.zeros((len(self.structures), len(self.structures)))
         for i in range(pairwise_matrix.shape[0] - 1):
             for j in range(i + 1, pairwise_matrix.shape[1]):
@@ -445,7 +456,6 @@ class StructureMultiple:
                 ) = self.get_pairwise_alignment(
                     coords_1,
                     coords_2,
-                    parameters,
                     gap_open_penalty=gap_open_penalty,
                     gap_extend_penalty=gap_extend_penalty,
                     weight=False,
@@ -461,9 +471,7 @@ class StructureMultiple:
         pairwise_matrix += pairwise_matrix.T
         return pairwise_matrix
 
-    def align(
-        self, pw_matrix, parameters, gap_open_penalty, gap_extend_penalty
-    ) -> dict:
+    def align(self, pw_matrix, gap_open_penalty, gap_extend_penalty) -> dict:
         """
         Makes a multiple structure alignment
 
@@ -478,7 +486,6 @@ class StructureMultiple:
         -------
         alignment = {name: indices of aligning residues with gaps as -1s}
         """
-        print("Aligning...")
         if len(self.structures) == 2:
             coords_1, coords_2 = (
                 self.structures[0].coordinates,
@@ -487,7 +494,6 @@ class StructureMultiple:
             dtw_1, dtw_2, _, _, _ = self.get_pairwise_alignment(
                 coords_1,
                 coords_2,
-                parameters,
                 gap_open_penalty=gap_open_penalty,
                 gap_extend_penalty=gap_extend_penalty,
                 weight=False,
@@ -496,13 +502,13 @@ class StructureMultiple:
                 self.structures[0].name: dtw_1,
                 self.structures[1].name: dtw_2,
             }
-            return self.alignment
+            return self.make_sequence_alignment()
         assert pw_matrix is not None
         assert pw_matrix.shape[0] == len(self.structures)
+        typer.echo("Constructing neighbor joining tree...")
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
-        print("Neighbor joining tree constructed")
         self.final_structures = [s for s in self.structures]
         self.final_consensus_weights = [
             np.full(
@@ -539,7 +545,6 @@ class StructureMultiple:
             ) = self.get_pairwise_alignment(
                 n1_coords,
                 n2_coords,
-                parameters,
                 gap_open_penalty=gap_open_penalty,
                 gap_extend_penalty=gap_extend_penalty,
                 weight=True,
@@ -566,18 +571,21 @@ class StructureMultiple:
                 n1_weights, n2_weights, dtw_aln_1, dtw_aln_2
             )
             self.final_structures.append(
-                protein_utility.Structure(name_int, mean_coords.shape[0], mean_coords)
+                Structure(name_int, mean_coords.shape[0], mean_coords)
             )
             self.final_consensus_weights.append(mean_weights)
 
-        for x in range(0, self.tree.shape[0] - 1, 2):
-            node_1, node_2, node_int = (
-                self.tree[x, 0],
-                self.tree[x + 1, 0],
-                self.tree[x, 1],
-            )
-            assert self.tree[x + 1, 1] == node_int
-            make_intermediate_node(node_1, node_2, node_int)
+        with typer.progressbar(
+            range(0, self.tree.shape[0] - 1, 2), label="Aligning"
+        ) as progress:
+            for x in progress:
+                node_1, node_2, node_int = (
+                    self.tree[x, 0],
+                    self.tree[x + 1, 0],
+                    self.tree[x, 1],
+                )
+                assert self.tree[x + 1, 1] == node_int
+                make_intermediate_node(node_1, node_2, node_int)
 
         node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
@@ -586,37 +594,55 @@ class StructureMultiple:
             **msa_alignments[self.final_structures[node_2].name],
         }
         self.alignment = alignment
-        return alignment
+        return self.make_sequence_alignment(alignment)
+
+    def make_sequence_alignment(self, alignment=None):
+        sequence_alignment = {}
+        if alignment is None:
+            alignment = self.alignment
+        for s in self.structures:
+            sequence_alignment[s.name] = "".join(
+                self.sequences[s.name][i] if i != -1 else "-" for i in alignment[s.name]
+            )
+        return sequence_alignment
 
     def write_files(
-        self,
-        write_fasta,
-        write_pdb,
-        write_features,
-        write_class,
-        num_threads,
-        overwrite_dssp,
+        self, write_fasta, write_pdb, write_features, write_class, num_threads=4,
     ):
         if any((write_fasta, write_pdb, write_pdb, write_class)):
-            print("Writing files...")
+            typer.echo("Writing files...")
         if write_fasta:
-            self.write_alignment(self.output_folder / "result.fasta")
+            fasta_file = self.output_folder / "result.fasta"
+            self.write_alignment(fasta_file)
+            typer.echo(
+                f"FASTA file: {typer.style(str(fasta_file), fg=typer.colors.GREEN)}",
+            )
         if write_pdb:
-            pdb_folder = self.output_folder / "superposed_pdb"
+            pdb_folder = self.output_folder / "superposed_pdbs"
             if not pdb_folder.exists():
                 pdb_folder.mkdir()
             self.write_superposed_pdbs(pdb_folder)
+            typer.echo(
+                f"Superposed PDB files: {typer.style(str(pdb_folder), fg=typer.colors.GREEN)}"
+            )
         if write_features:
             dssp_dir = self.output_folder / ".caretta_tmp"
             if not dssp_dir.exists():
                 dssp_dir.mkdir()
-            with open(str(self.output_folder / "result_features.pkl"), "wb") as f:
-                pickle.dump(
-                    self.get_aligned_features(dssp_dir, num_threads, overwrite_dssp), f
-                )
+            feature_file = self.output_folder / "result_features.pkl"
+            self.features = self.get_aligned_features(str(dssp_dir), num_threads)
+            with open(feature_file, "wb") as f:
+                pickle.dump(self.features, f)
+            typer.echo(
+                f"Aligned features: {typer.style(str(feature_file), fg=typer.colors.GREEN)}"
+            )
         if write_class:
-            with open(str(self.output_folder / "result_class.pkl"), "wb") as f:
+            class_file = self.output_folder / "result_class.pkl"
+            with open(class_file, "wb") as f:
                 pickle.dump(self, f)
+            typer.echo(
+                f"Class file: {typer.style(str(class_file), fg=typer.colors.GREEN)}"
+            )
 
     def write_alignment(self, filename, alignments: dict = None):
         """
@@ -659,11 +685,11 @@ class StructureMultiple:
         )
         aln_ref = alignments[reference_name]
         ref_coords_core = (
-            reference_pdb[protein_utility.get_alpha_indices(reference_pdb)]
+            reference_pdb[helper.get_alpha_indices(reference_pdb)]
             .getCoords()
             .astype(np.float64)[np.array([aln_ref[c] for c in core_indices])]
         )
-        ref_centroid = nb_mean_axis_0(ref_coords_core)
+        ref_centroid = helper.nb_mean_axis_0(ref_coords_core)
         ref_coords_core -= ref_centroid
         transformation = pd.Transformation(np.eye(3), -ref_centroid)
         reference_pdb = pd.applyTransformation(transformation, reference_pdb)
@@ -675,7 +701,7 @@ class StructureMultiple:
             )
             aln_name = alignments[name]
             common_coords_2 = (
-                pdb[protein_utility.get_alpha_indices(pdb)]
+                pdb[helper.get_alpha_indices(pdb)]
                 .getCoords()
                 .astype(np.float64)[np.array([aln_name[c] for c in core_indices])]
             )
@@ -690,22 +716,24 @@ class StructureMultiple:
             pd.writePDB(str(output_pdb_folder / f"{name}.pdb"), pdb)
 
     def get_aligned_features(
-        self, dssp_dir, num_threads, force_overwrite, alignments: dict = None
-    ):
+        self, dssp_dir, num_threads, alignment: dict = None
+    ) -> typing.Dict[str, np.ndarray]:
         """
         Get dict of aligned features
         """
-        if alignments is None:
-            alignments = self.alignment
+        if alignment is None:
+            alignment = self.make_sequence_alignment()
+
+        pdb_files = [
+            self.output_folder / "cleaned_pdb" / f"{s.name}.pdb"
+            for s in self.structures
+        ]
         features = feature_extraction.get_features_multiple(
-            helper.parse_pdb_files(self.output_folder / "cleaned_pdb"),
-            str(dssp_dir),
-            num_threads=num_threads,
-            force_overwrite=force_overwrite,
+            pdb_files, str(dssp_dir), num_threads=num_threads, force_overwrite=True
         )
         feature_names = list(features[0].keys())
         aligned_features = {}
-        alignment_length = len(alignments[self.structures[0].name])
+        alignment_length = len(alignment[self.structures[0].name])
         for feature_name in feature_names:
             if feature_name == "secondary":
                 continue
@@ -720,7 +748,7 @@ class StructureMultiple:
                 indices = [
                     i
                     for i in range(alignment_length)
-                    if alignments[self.structures[p].name][i] != "-"
+                    if alignment[self.structures[p].name][i] != "-"
                 ]
                 aligned_features[feature_name][p, indices] = farray
         return aligned_features
@@ -736,7 +764,7 @@ class StructureMultiple:
         # core_indices = np.array([i for i in range(len(alignments[reference_key])) if '-' not in [alignments[n][i] for n in alignments]])
         aln_ref = alignments[reference_key]
         # ref_coords = self.structures[reference_index].coordinates[np.array([aln_ref[c] for c in core_indices])]
-        # ref_centroid = nb_mean_axis_0(ref_coords)
+        # ref_centroid = helper.nb_mean_axis_0(ref_coords)
         # ref_coords -= ref_centroid
         for i in range(len(self.structures)):
             # if i == reference_index:
@@ -813,3 +841,21 @@ class StructureMultiple:
                     j, i
                 ] = common_coords_1.shape[0] / len(aln_1)
         return pairwise_rmsd_matrix, pairwise_coverage
+
+
+def trigger_numba_compilation():
+    """
+    Run this at the beginning of a Caretta run to compile Numba functions
+    """
+    parameters = {"size": 1, "gap_open_penalty": 0.0, "gap_extend_penalty": 0.0}
+    coords_1 = np.zeros((2, 3))
+    coords_2 = np.zeros((2, 3))
+    superposition_functions.signal_svd_superpose_function(
+        coords_1, coords_2, parameters
+    )
+    distance_matrix = np.random.random((5, 5))
+    nj.neighbor_joining(distance_matrix)
+    aln_1 = np.array([0, -1, 1])
+    aln_2 = np.array([0, 1, -1])
+    get_common_coordinates(coords_1, coords_2, aln_1, aln_2)
+    get_mean_coords(aln_1, coords_1, aln_2, coords_2)

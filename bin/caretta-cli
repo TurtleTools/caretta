@@ -1,71 +1,103 @@
 #!/usr/bin/env python3
-
+from caretta import multiple_alignment
 from pathlib import Path
+import typer
 
-import fire
-
-from caretta import msa_numba
+app = typer.Typer()
 
 
-def align(input_pdb,
-          dssp_dir="caretta_tmp", num_threads=20, extract_all_features=False,
-          gap_open_penalty=1., gap_extend_penalty=0.01, consensus_weight=1.,
-          write_fasta=True, output_fasta_filename=Path("./result.fasta"),
-          write_pdb=True, output_pdb_folder=Path("./result_pdb/"),
-          write_features=True, output_feature_filename=Path("./result_features.pkl"),
-          write_class=True, output_class_filename=Path("./result_class.pkl"),
-          overwrite_dssp=False):
+def input_folder_callback(folder: Path) -> Path:
+    if not folder.exists():
+        raise typer.BadParameter(f"Folder {folder} does not exist")
+    return folder
+
+
+def output_folder_callback(folder: Path) -> Path:
+    if folder.exists():
+        raise typer.BadParameter(
+            f"Folder {folder} already exists, cowardly refusing to overwrite. Please delete it and try again"
+        )
+    return folder
+
+
+def positive_penalty(value: float) -> float:
+    if value < 0.0:
+        raise typer.BadParameter(f"Value {value} must be positive")
+    return value
+
+
+@app.command()
+def align(
+    input_pdb: Path = typer.Argument(
+        ..., help="A folder with input protein files", callback=input_folder_callback
+    ),
+    gap_open_penalty: float = typer.Option(
+        1.0, "-p", help="gap open penalty", callback=positive_penalty
+    ),
+    gap_extend_penalty: float = typer.Option(
+        0.01, "-e", help="gap extend penalty", callback=positive_penalty
+    ),
+    consensus_weight: float = typer.Option(
+        1.0,
+        "--consensus-weight",
+        "-c",
+        help="weight well-aligned segments to reduce gaps in these areas",
+        callback=positive_penalty,
+    ),
+    full: bool = typer.Option(
+        False,
+        "--full",
+        "-f",
+        help="Use all vs. all pairwise alignment for distance matrix calculation (much slower)",
+    ),
+    output: Path = typer.Option(
+        Path("caretta_results"),
+        "--output",
+        "-o",
+        help="folder to store output files",
+        callback=output_folder_callback,
+    ),
+    fasta: bool = typer.Option(True, help="write alignment in FASTA file format"),
+    pdb: bool = typer.Option(
+        True, help="write PDB files superposed according to alignment"
+    ),
+    threads: int = typer.Option(
+        4, "--threads", "-t", help="number of threads to use for feature extraction"
+    ),
+    features: bool = typer.Option(
+        False,
+        "--features",
+        help="extract and write aligned features as a dictionary of NumPy arrays into a pickle file",
+    ),
+    write_class: bool = typer.Option(
+        False,
+        "--class",
+        help="write StructureMultiple class with intermediate structures and tree to pickle file",
+    ),
+):
     """
-    Caretta aligns protein structures and returns a sequence alignment, superposed PDB files, a set of aligned feature matrices, and
-    a class with intermediate structures made during progressive alignment.
-    Parameters
-    ----------
-    input_pdb
-        Can be \n
-        A folder with input protein files \n
-        A file which lists PDB filenames on each line \n
-        A file which lists PDB IDs on each line \n
-    dssp_dir
-        Folder to store temp DSSP files (default caretta_tmp)
-    num_threads
-        Number of threads to use for feature extraction
-    extract_all_features
-        True => obtains all features (default True) \n
-        False => only DSSP features (faster)
-    gap_open_penalty
-        default 1
-    gap_extend_penalty
-        default 0.01
-    consensus_weight
-        default 1
-    write_fasta
-        True => writes alignment as fasta file (default True)
-    output_fasta_filename
-        Fasta file of alignment (default result.fasta)
-    write_pdb
-        True => writes all protein PDB files superposed by alignment (default True)
-    output_pdb_folder
-        Folder to write superposed PDB files (default result_pdb)
-    write_features
-        True => writes aligned features a s a dictionary of numpy arrays into a pickle file (default True)
-    output_feature_filename
-        Pickle file to write aligned features (default result_features.pkl)
-    write_class
-        True => writes StructureMultiple class with intermediate structures and tree to pickle file (default True)
-    output_class_filename
-        Pickle file to write StructureMultiple class (default result_class.pkl)
-    overwrite_dssp
-        Forces DSSP to rerun (default False)
+    Align protein structures using Caretta.
+
+    Writes the resulting sequence alignment and superposed PDB files to "caretta_results".
+    Optionally also outputs a set of aligned feature matrices, or the python class with intermediate structures made during progressive alignment.
     """
-    msa_numba.StructureMultiple.align_from_pdb_files(input_pdb,
-                                                     dssp_dir, num_threads, extract_all_features,
-                                                     gap_open_penalty, gap_extend_penalty, consensus_weight,
-                                                     write_fasta, output_fasta_filename,
-                                                     write_pdb, output_pdb_folder,
-                                                     write_features, output_feature_filename,
-                                                     write_class, output_class_filename,
-                                                     overwrite_dssp)
+    input_pdb = input_folder_callback(input_pdb)
+    output = output_folder_callback(output)
+    multiple_alignment.trigger_numba_compilation()
+    multiple_alignment.StructureMultiple.align_from_pdb_files(
+        input_pdb,
+        gap_open_penalty,
+        gap_extend_penalty,
+        consensus_weight,
+        full,
+        output,
+        threads,
+        fasta,
+        pdb,
+        features,
+        write_class,
+    )
 
 
-if __name__ == '__main__':
-    fire.Fire(align)
+if __name__ == "__main__":
+    app()

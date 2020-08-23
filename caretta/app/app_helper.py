@@ -1,10 +1,148 @@
+import base64
+import datetime
+import pickle
 from dataclasses import dataclass
 from pathlib import Path
-
+import numpy as np
 import prody as pd
 import requests as rq
 
-from caretta import msa_numba
+import typing
+
+from caretta import multiple_alignment
+
+
+def heatmap(data):
+    return dict(
+        data=[dict(z=data, type="heatmap", showscale=False)],
+        layout=dict(margin=dict(l=25, r=25, t=25, b=25)),
+    )
+
+
+def empty_dict():
+    data = [dict(z=np.zeros((2, 2)), type="heatmap", showscale=False)]
+    layout = dict(margin=dict(l=25, r=25, t=25, b=25))
+    return dict(data=data, layout=layout)
+
+
+def empty_object(suite):
+    return compress_object(np.zeros(0), suite)
+
+
+def get_estimated_time(msa_class: multiple_alignment.StructureMultiple):
+    n = len(msa_class.structures)
+    l = max(s.length for s in msa_class.structures)
+    func = lambda x, r: (x[0] ** 2 * r * x[1] ** 2)
+    return str(datetime.timedelta(seconds=int(func((l, n), 9.14726052e-06))))
+
+
+def line(data):
+    y = np.array([np.nanmean(data[:, x]) for x in range(data.shape[1])])
+    y_se = np.array(
+        [np.nanstd(data[:, x]) / np.sqrt(data.shape[1]) for x in range(data.shape[1])]
+    )
+
+    data = [
+        dict(
+            y=list(y + y_se) + list(y - y_se)[::-1],
+            x=list(range(data.shape[1])) + list(range(data.shape[1]))[::-1],
+            fillcolor="lightblue",
+            fill="toself",
+            type="scatter",
+            mode="lines",
+            name="Standard error",
+            line=dict(color="lightblue"),
+        ),
+        dict(
+            y=y,
+            x=np.arange(data.shape[1]),
+            type="scatter",
+            mode="lines",
+            name="Mean",
+            line=dict(color="blue"),
+        ),
+    ]
+    return dict(
+        data=data,
+        layout=dict(legend=dict(x=0.5, y=1.2), margin=dict(l=25, r=25, t=25, b=25)),
+    )
+
+
+def scatter3D(coordinates_dict):
+    data = []
+    for k, v in coordinates_dict.items():
+        x, y, z = v[:, 0], v[:, 1], v[:, 2]
+        data.append(
+            dict(
+                x=x,
+                y=y,
+                z=z,
+                mode="lines",
+                type="scatter3d",
+                text=None,
+                name=str(k),
+                line=dict(width=3, opacity=0.8),
+            )
+        )
+    layout = dict(
+        margin=dict(l=20, r=20, t=20, b=20),
+        clickmode="event+select",
+        scene=dict(
+            xaxis=dict(visible=False, showgrid=False, showline=False),
+            yaxis=dict(visible=False, showgrid=False, showline=False),
+            zaxis=dict(visible=False, showgrid=False, showline=False),
+        ),
+    )
+    return dict(data=data, layout=layout)
+
+
+def write_feature_as_tsv(
+    feature_data: np.ndarray, keys: typing.List[str], file_name: typing.Union[Path, str]
+):
+    with open(file_name, "w") as f:
+        for i in range(feature_data.shape[0]):
+            f.write(
+                "\t".join([keys[i]] + [str(x) for x in list(feature_data[i])]) + "\n"
+            )
+
+
+def compress_object(raw_object, suite):
+    return base64.b64encode(suite.encrypt(pickle.dumps(raw_object, protocol=4))).decode(
+        "utf-8"
+    )
+
+
+def decompress_object(compressed_object, suite):
+    return pickle.loads(suite.decrypt(base64.b64decode(compressed_object)))
+
+
+def protein_to_aln_index(protein_index, aln_seq):
+    n = 0
+    for i in range(len(aln_seq)):
+        if protein_index == n:
+            return i
+        elif aln_seq[i] == "-":
+            pass
+        else:
+            n += 1
+
+
+def aln_index_to_protein(alignment_index, alignment):
+    res = dict()
+    for k, v in alignment.items():
+        if v[alignment_index] == "-":
+            res[k] = None
+        else:
+            res[k] = alignment_index - v[:alignment_index].count("-")
+    return res
+
+
+def to_fasta_str(alignment):
+    res = []
+    for k, v in alignment.items():
+        res.append(f">{k}")
+        res.append(v)
+    return "\n".join(res)
 
 
 @dataclass
@@ -51,8 +189,10 @@ class PdbEntry:
         )
 
     @classmethod
-    def from_user_input(cls, pdb_path, chain_id="A"):
-        return cls(pdb_path, chain_id, -1, -1, "none", "none", "none", 0.0, pdb_path)
+    def from_user_input(cls, pdb_path, chain_id="none"):
+        return cls(
+            Path(pdb_path).stem, chain_id, -1, -1, "none", "none", "none", 0.0, pdb_path
+        )
 
     def get_pdb(self, from_atm_file=None):
         if from_atm_file is not None:
@@ -98,14 +238,6 @@ class PdbEntry:
         return f"{self.PDB_ID}_{self.CHAIN_ID}_{self.PdbResNumStart}"
 
 
-def get_pdbs_from_folder(path):
-    file_names = Path(path).glob("*.pdb")
-    res = []
-    for f in file_names:
-        res.append(PdbEntry.from_user_input(str(f)))
-    return res
-
-
 class PfamToPDB:
     def __init__(
         self,
@@ -125,6 +257,7 @@ class PfamToPDB:
         data_lines = data_lines[1:]
         self.pfam_to_pdb_ids = dict()
         self._initiate_pfam_to_pdbids(data_lines, limit=limit)
+        self.pdb_entries = None
         self.msa = None
         self.caretta_alignment = None
 
@@ -152,66 +285,10 @@ class PfamToPDB:
                     n += 1
             self.pfam_to_pdb_ids = new
 
-    def multiple_structure_alignment_from_pfam(
-        self, pdb_entries, gap_open_penalty=0.1, gap_extend_penalty=0.001
-    ):
-        self.msa = PfamStructures.from_pdb_files([p.get_pdb()[1] for p in pdb_entries])
-        self.caretta_alignment = self.msa.align(
-            gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty
-        )
-        return (
-            self.caretta_alignment,
-            {s.name: pd.parsePDB(s.pdb_file) for s in self.msa.structures},
-            {s.name: s.features for s in self.msa.structures},
-        )
-
     def get_entries_for_pfam(
-        self, pfam_id, limit_by_score=1.0, limit_by_protein_number=50, gross_limit=1000
+        self, pfam_id, limit_by_score=1.0, limit_by_protein_number=50
     ):
         pdb_entries = list(
             filter(lambda x: (x.eValue < limit_by_score), self.pfam_to_pdb_ids[pfam_id])
         )[:limit_by_protein_number]
         return pdb_entries
-
-    def alignment_from_folder(self):
-        pass
-
-    def to_fasta_str(self, alignment):
-        res = []
-        for k, v in alignment.items():
-            res.append(f">{k}")
-            res.append(v)
-        return "\n".join(res)
-
-
-class PfamStructures(msa_numba.StructureMultiple):
-    def __init__(
-        self,
-        pdb_entries,
-        dssp_dir="caretta_tmp",
-        num_threads=20,
-        extract_all_features=True,
-        consensus_weight=1.0,
-        write_fasta=True,
-        output_fasta_filename=Path("./result.fasta"),
-        write_pdb=True,
-        output_pdb_folder=Path("./result_pdb/"),
-        write_features=True,
-        output_feature_filename=Path("./result_features.pkl"),
-        write_class=True,
-        output_class_filename=Path("./result_class.pkl"),
-        overwrite_dssp=False,
-    ):
-        self.pdb_entries = pdb_entries
-        super(PfamStructures, self).from_pdb_files(
-            [p.get_pdb()[1] for p in self.pdb_entries],
-            dssp_dir,
-            num_threads,
-            extract_all_features,
-            consensus_weight,
-            output_fasta_filename,
-            output_pdb_folder,
-            output_feature_filename,
-            output_class_filename,
-            overwrite_dssp,
-        )

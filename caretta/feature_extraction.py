@@ -5,7 +5,7 @@ import numpy as np
 import prody as pd
 import Bio.PDB
 from Bio.PDB.ResidueDepth import get_surface, residue_depth, ca_depth, min_dist
-from geometricus import protein_utility
+from caretta import helper
 
 
 def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
@@ -94,8 +94,8 @@ def get_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
     dict of anm_ca, anm_cb, gnm_ca, gnm_cb
     """
     data = {}
-    beta_indices = protein_utility.get_beta_indices(protein)
-    alpha_indices = protein_utility.get_alpha_indices(protein)
+    beta_indices = helper.get_beta_indices(protein)
+    alpha_indices = helper.get_alpha_indices(protein)
     data["anm_cb"] = get_anm_fluctuations(protein[beta_indices], n_modes)
     data["gnm_cb"] = get_gnm_fluctuations(protein[beta_indices], n_modes)
     data["anm_ca"] = get_anm_fluctuations(protein[alpha_indices], n_modes)
@@ -120,7 +120,7 @@ def get_gnm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
 
 
 def get_features_multiple(
-    pdb_files, dssp_dir, num_threads=20, only_dssp=True, force_overwrite=False
+    pdb_files, dssp_dir, num_threads=20, only_dssp=True, force_overwrite=True
 ):
     """
     Extract features for a list of pdb_files in parallel
@@ -132,7 +132,7 @@ def get_features_multiple(
         directory to store tmp dssp files
     num_threads
     only_dssp
-        extract only dssp features (use if not interested in features)
+        extract only dssp features
     force_overwrite
         force rerun DSSP
 
@@ -228,18 +228,18 @@ def get_dssp_features(protein_dssp):
         if label.startswith("dssp") and label not in dssp_ignore
     ]
     data = {}
-    alpha_indices = protein_utility.get_alpha_indices(protein_dssp)
+    alpha_indices = helper.get_alpha_indices(protein_dssp)
     indices = [protein_dssp[x].getData("dssp_resnum") for x in alpha_indices]
-    for label in dssp_labels:
+    assert len(alpha_indices) == len(indices)
+    for label in dssp_labels + ["secondary"]:
         label_to_index = {
             i - 1: protein_dssp[x].getData(label)
             for i, x in zip(indices, alpha_indices)
         }
-        data[f"{label}"] = np.array(
+        data[label] = np.array(
             [
                 label_to_index[i] if i in label_to_index else 0
                 for i in range(len(alpha_indices))
             ]
         )
-    data["secondary"] = protein_dssp.getData("secondary")[alpha_indices]
     return data

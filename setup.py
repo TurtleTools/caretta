@@ -11,7 +11,7 @@ setup(
         "scipy",
         "prody",
         "biopython",
-        "fire",
+        "typer",
         "pyparsing",
     ],
     extras_require={
@@ -22,7 +22,6 @@ setup(
             "dash-core-components==1.2.1",
             "dash-html-components==1.0.1",
             "dash-renderer==1.1.0",
-            "dash-table==4.3.0",
             "plotly==3.7.1",
             "flask",
         ]
