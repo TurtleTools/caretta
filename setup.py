@@ -4,7 +4,7 @@ setup(
     name="caretta",
     version="1.0",
     authors=["Janani Durairaj", "Mehmet Akdel"],
-    packages=["caretta"],
+    packages=["caretta", "caretta/app"],
     install_requires=[
         "numpy",
         "numba",
