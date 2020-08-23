@@ -288,6 +288,59 @@ class StructureMultiple:
         )
         return msa_class
 
+    @classmethod
+    def from_coordinates(
+            cls,
+            names: typing.List[str],
+            coordinates_list: typing.List[np.ndarray],
+            sequences: typing.List[str],
+            superposition_parameters: dict,
+            superposition_function=superposition_functions.moment_multiple_svd_superpose_function,
+            score_function=score_functions.get_caretta_score,
+            consensus_weight=1.0,
+            output_folder=Path("./caretta_results"),
+    ):
+        """
+        Makes a StructureMultiple object from a list of coordinates
+
+        Parameters
+        ----------
+        names
+        coordinates_list
+        sequences
+        superposition_parameters
+            parameters to give to the superposition function
+        superposition_function
+            a function that takes two coordinate sets as input and superposes them
+            returns a score, superposed_coords_1, superposed_coords_2
+        score_function
+            a function that takes two paired coordinate sets (same shape) and returns a score
+        consensus_weight
+            weights the effect of well-aligned columns on the progressive alignment
+        output_folder
+
+        Returns
+        -------
+        StructureMultiple object (unaligned)
+        """
+        output_folder = Path(output_folder)
+        if not output_folder.exists():
+            output_folder.mkdir()
+        sequences = {n: s for n, s in zip(names, sequences)}
+        structures = []
+        for name, coordinates in zip(names, coordinates_list):
+            structures.append(Structure(name, coordinates.shape[0], coordinates))
+        msa_class = StructureMultiple(
+            structures,
+            sequences,
+            superposition_parameters,
+            superposition_function,
+            score_function=score_function,
+            consensus_weight=consensus_weight,
+            output_folder=output_folder,
+        )
+        return msa_class
+
     def get_pairwise_alignment(
         self,
         coords_1,
