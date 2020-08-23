@@ -26,5 +26,5 @@ setup(
             "flask",
         ]
     },
-    scripts=["bin/caretta-app", "bin/caretta-cli"],
+    scripts=["bin/caretta-app", "bin/caretta-cli", "bin/caretta-app-demo"],
 )
