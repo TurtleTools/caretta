@@ -56,7 +56,7 @@ export NUMBA_NUM_THREADS=20 # change to required number of threads
 ```bash
 caretta-cli input_pdb_folder
 # e.g. caretta-cli test_data  
-# caretta-cli -h for more options
+# caretta-cli --help for more options
 ```
 
 ### Web-application Usage (Mac and Linux only)
@@ -65,6 +65,7 @@ caretta-cli input_pdb_folder
 caretta-app <host-ip> <port> 
 # e.g. caretta-app localhost 8091
 ```
+Then go to localhost:8091/caretta in a browser window.
 
 ## Publications
 Akdel, Mehmet, Janani Durairaj, Dick de Ridder, and Aalt DJ van Dijk. "Caretta-A Multiple Protein Structure Alignment and Feature Extraction Suite." Computational and Structural Biotechnology Journal (2020). (https://doi.org/10.1016/j.csbj.2020.03.011)
