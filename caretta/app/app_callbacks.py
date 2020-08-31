@@ -5,6 +5,7 @@ import dash
 import dash_bio
 import dash_core_components as dcc
 import numpy as np
+import pyparsing
 
 from caretta import multiple_alignment
 from caretta.app import app_helper, app_layout
@@ -117,7 +118,7 @@ def register_callbacks(app, get_pdb_entries, suite):
             for p in pdb_entries:
                 try:
                     pdb_files.append(p.get_pdb()[1])
-                except (OSError, AttributeError):
+                except (OSError, AttributeError, pyparsing.ParseException):
                     continue
             msa_class = multiple_alignment.StructureMultiple.from_pdb_files(
                 pdb_files,
@@ -142,7 +143,7 @@ def register_callbacks(app, get_pdb_entries, suite):
             dssp_dir = msa_class.output_folder / ".caretta_tmp"
             if not dssp_dir.exists():
                 dssp_dir.mkdir()
-            features = msa_class.get_aligned_features(dssp_dir, 4)
+            features = msa_class.get_aligned_features(dssp_dir, num_threads=4, only_dssp=False)
             caretta_class = app_helper.compress_object(msa_class, suite)
             sequence_alignment_data = app_helper.compress_object(
                 sequence_alignment, suite
