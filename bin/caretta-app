@@ -17,7 +17,6 @@ STATIC = Path("static")
 if not STATIC.exists():
     STATIC.mkdir()
 
-ADDITION = ""
 
 external_stylesheets = [
     "https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css"

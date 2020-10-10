@@ -13,6 +13,7 @@ setup(
         "biopython",
         "typer",
         "pyparsing",
+        "geometricus"
     ],
     extras_require={
         "GUI": [

@@ -56,6 +56,17 @@ def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
 
 
 @nb.njit
+def nb_std_axis_0(array: np.ndarray) -> np.ndarray:
+    """
+    Same as np.std(array, axis=0) but njitted
+    """
+    std_array = np.zeros(array.shape[1])
+    for i in range(array.shape[1]):
+        std_array[i] = np.std(array[:, i])
+    return std_array
+
+
+@nb.njit
 def normalize(numbers):
     minv, maxv = np.min(numbers), np.max(numbers)
     return (numbers - minv) / (maxv - minv)
