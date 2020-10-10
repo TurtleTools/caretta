@@ -16,7 +16,7 @@ The command-line tool and self-hosted web application do not have this restricti
 2. Windows
 * The external tool **msms** is not available in Windows. Due to this:
     * Feature extraction is not available.
-    * `extract-all-features` argument in caretta-cli should be always False. 
+    * `features` argument in caretta-cli must always be run with `--only-dssp`. 
     * `caretta-app` is not available.
 
 #### Software
@@ -29,7 +29,7 @@ conda install -c bioconda msms
 
 ### Download caretta
 ```bash
-git clone https://git.wur.nl/durai001/caretta.git
+git clone https://github.com/TurtleTools/caretta.git
 cd caretta
 ```
 
