@@ -22,15 +22,15 @@ from caretta import (
 
 @nb.njit
 def tm_score(coords_1, coords_2, l1, l2):
-    d1 = 1.24 * (l1 - 15) ** 1/3 - 1.8
+    d1 = 1.24 * (l1 - 15) ** 1 / 3 - 1.8
     d2 = 1.24 * (l2 - 15) ** 1 / 3 - 1.8
     sum_1 = 0
     sum_2 = 0
     for i in range(coords_1.shape[0]):
         sum_1 += 1 / (1 + (np.sqrt(np.sum((coords_1[i] - coords_2[i]) ** 2)) / d1))
         sum_2 += 1 / (1 + (np.sqrt(np.sum((coords_1[i] - coords_2[i]) ** 2)) / d2))
-    t1 = (1/l1) * sum_1
-    t2 = (1/l2) * sum_2
+    t1 = (1 / l1) * sum_1
+    t2 = (1 / l2) * sum_2
     return max(t1, t2)
 
 
@@ -142,16 +142,14 @@ class OutputFiles:
 
 DEFAULT_SUPERPOSITION_PARAMETERS = {
     # must-have
-    "gap_open_penalty": 0.01,
-    "gap_extend_penalty": 0.001,
+    "gap_open_penalty": 0.,
+    "gap_extend_penalty": 0.,
     "gamma": 0.03,
     # changes per superposition_function
-    "num_split_types": 2,
-    "split_type_0": "KMER",
-    "split_size_0": 30,
-    "split_type_1": "RADIUS",
-    "split_size_1": 16,
+    "split_type": "KMER",
+    "split_size": 20,
     "scale": True,
+    "gamma_moment": 0.6
 }
 
 
@@ -220,6 +218,7 @@ class StructureMultiple:
             write_features: bool = False,
             only_dssp: bool = True,
             write_class: bool = False,
+            verbose: bool = True
     ):
         """
         Caretta aligns protein structures and can output a sequence alignment, superposed PDB files,
@@ -261,6 +260,7 @@ class StructureMultiple:
         write_class
             True => writes StructureMultiple class with intermediate structures and tree to pickle file (default True)
             writes to output_folder / result_class.pkl
+        verbose
 
         Returns
         -------
@@ -269,25 +269,26 @@ class StructureMultiple:
         msa_class = StructureMultiple.from_pdb_files(
             input_pdb,
             superposition_parameters=DEFAULT_SUPERPOSITION_PARAMETERS,
-            superposition_function=superposition_functions.moment_multiple_svd_superpose_function,
+            superposition_function=superposition_functions.moment_svd_superpose_function,
             consensus_weight=consensus_weight,
             output_folder=output_folder,
+            verbose=verbose
         )
         if len(msa_class.structures) > 2:
             if full:
                 pw_matrix = msa_class.make_pairwise_dtw_matrix(
-                    gap_open_penalty, gap_extend_penalty
+                    gap_open_penalty, gap_extend_penalty, verbose=verbose
                 )
             else:
-                pw_matrix = msa_class.make_pairwise_shape_matrix()
-            msa_class.align(pw_matrix, gap_open_penalty, gap_extend_penalty)
+                pw_matrix = msa_class.make_pairwise_shape_matrix(verbose=verbose)
+            msa_class.align(pw_matrix, gap_open_penalty, gap_extend_penalty, verbose=verbose)
         else:
             msa_class.align(
-                gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty
+                gap_open_penalty=gap_open_penalty, gap_extend_penalty=gap_extend_penalty, verbose=verbose
             )
 
         msa_class.write_files(
-            write_fasta, write_pdb, write_features, write_class, num_threads, only_dssp=only_dssp
+            write_fasta, write_pdb, write_features, write_class, num_threads, only_dssp=only_dssp, verbose=verbose
         )
         return msa_class
 
@@ -296,9 +297,10 @@ class StructureMultiple:
             cls,
             input_pdb,
             superposition_parameters,
-            superposition_function=superposition_functions.moment_multiple_svd_superpose_function,
+            superposition_function=superposition_functions.moment_svd_superpose_function,
             consensus_weight=1.0,
             output_folder=Path("./caretta_results"),
+            verbose: bool = False
     ):
         """
         Makes a StructureMultiple object from a list of pdb files/names or a folder of pdb files
@@ -315,6 +317,7 @@ class StructureMultiple:
         consensus_weight
             weights the effect of well-aligned columns on the progressive alignment
         output_folder
+        verbose
 
         Returns
         -------
@@ -328,7 +331,8 @@ class StructureMultiple:
         if not cleaned_pdb_folder.exists():
             cleaned_pdb_folder.mkdir()
         pdb_files = helper.parse_pdb_files_and_clean(input_pdb, cleaned_pdb_folder)
-        typer.echo(f"Found {len(pdb_files)} PDB files")
+        if verbose:
+            typer.echo(f"Found {len(pdb_files)} PDB files")
 
         structures = []
         sequences = {}
@@ -407,6 +411,7 @@ class StructureMultiple:
             weights_1=None,
             weights_2=None,
             n_iter=3,
+            verbose: bool = False
     ):
         """
         Aligns coords_1 to coords_2 by first superposing and then running dtw on the score matrix of the superposed coordinate sets
@@ -420,6 +425,7 @@ class StructureMultiple:
         weights_1
         weights_2
         n_iter
+        verbose
 
         Returns
         -------
@@ -444,9 +450,9 @@ class StructureMultiple:
     def make_pairwise_shape_matrix(
             self,
             resolution: typing.Union[float, np.ndarray] = 2.0,
-            kmer_size: int = 30,
-            radius: int = 16,
+            parameters: dict = None,
             metric="braycurtis",
+            verbose: bool = False
     ):
         """
         Makes an all vs. all matrix of distance scores between all the structures.
@@ -454,56 +460,50 @@ class StructureMultiple:
         Parameters
         ----------
         resolution
-        kmer_size
-        radius
+        parameters
+            to use for making invariants
+            needs to have
+            num_split_types
+            split_type_i
+            split_size_i
         metric
             distance metric (accepts any metric supported by scipy.spatial.distance
-
+        verbose
         Returns
         -------
         [n x n] distance matrix
         """
-        typer.echo("Calculating pairwise distances...")
-        kmer_invariants = (
-            MomentInvariants.from_coordinates(
-                s.name,
-                s.coordinates,
-                None,
-                split_size=kmer_size,
-                split_type=SplitType.KMER,
+        if verbose:
+            typer.echo("Calculating pairwise distances...")
+        if parameters is None:
+            parameters = dict(num_split_types = 1, split_type_0 = "KMER", split_size_0 = 20)
+        embedders = []
+        for i in range(parameters["num_split_types"]):
+            invariants = (
+                MomentInvariants.from_coordinates(
+                    s.name,
+                    s.coordinates,
+                    None,
+                    split_size=parameters[f"split_size_{i}"],
+                    split_type=SplitType[parameters[f"split_type_{i}"]],
+                )
+                for s in self.structures
             )
-            for s in self.structures
-        )
-        radius_invariants = (
-            MomentInvariants.from_coordinates(
-                s.name,
-                s.coordinates,
-                None,
-                split_size=radius,
-                split_type=SplitType.RADIUS,
-            )
-            for s in self.structures
-        )
-        kmer_embedder = GeometricusEmbedding.from_invariants(
-            kmer_invariants,
-            resolution=resolution,
-            protein_keys=[s.name for s in self.structures],
-        )
-        radius_embedder = GeometricusEmbedding.from_invariants(
-            radius_invariants,
-            resolution=resolution,
-            protein_keys=[s.name for s in self.structures],
-        )
+            embedders.append(GeometricusEmbedding.from_invariants(
+                invariants,
+                resolution=resolution,
+                protein_keys=[s.name for s in self.structures],
+            ))
         distance_matrix = squareform(
             pdist(
-                np.hstack((kmer_embedder.embedding, radius_embedder.embedding)),
+                np.hstack((embedder.embedding for embedder in embedders)),
                 metric=metric,
             )
         )
         return distance_matrix
 
     def make_pairwise_dtw_matrix(
-            self, gap_open_penalty: float, gap_extend_penalty: float, invert=True,
+            self, gap_open_penalty: float, gap_extend_penalty: float, invert=True, verbose:bool=False
     ):
         """
         Makes an all vs. all matrix of distance (or similarity) scores between all the structures using pairwise alignment.
@@ -515,12 +515,13 @@ class StructureMultiple:
         invert
             if True returns distance matrix
             if False returns similarity matrix
-
+        verbose
         Returns
         -------
         [n x n] matrix
         """
-        typer.echo("Calculating pairwise distances...")
+        if verbose:
+            typer.echo("Calculating pairwise distances...")
         pairwise_matrix = np.zeros((len(self.structures), len(self.structures)))
         for i in range(pairwise_matrix.shape[0] - 1):
             for j in range(i + 1, pairwise_matrix.shape[1]):
@@ -553,7 +554,7 @@ class StructureMultiple:
         pairwise_matrix += pairwise_matrix.T
         return pairwise_matrix
 
-    def align(self, pw_matrix, gap_open_penalty, gap_extend_penalty, return_sequence=True) -> dict:
+    def align(self, pw_matrix, gap_open_penalty, gap_extend_penalty, return_sequence: bool = True, verbose: bool = False) -> dict:
         """
         Makes a multiple structure alignment
 
@@ -563,7 +564,10 @@ class StructureMultiple:
             pairwise similarity matrix to base the neighbor joining tree on
         gap_open_penalty
         gap_extend_penalty
-
+        return_sequence
+            if True returns sequence alignment
+            else indices of aligning residues with gaps as -1s
+        verbose
         Returns
         -------
         alignment = {name: indices of aligning residues with gaps as -1s}
@@ -579,7 +583,8 @@ class StructureMultiple:
                 gap_open_penalty=gap_open_penalty,
                 gap_extend_penalty=gap_extend_penalty,
                 weight=False,
-                n_iter=self.superposition_parameters["n_iter"]
+                n_iter=self.superposition_parameters["n_iter"],
+                verbose=verbose
             )
             self.alignment = {
                 self.structures[0].name: dtw_1,
@@ -591,7 +596,8 @@ class StructureMultiple:
                 return self.alignment
         assert pw_matrix is not None
         assert pw_matrix.shape[0] == len(self.structures)
-        typer.echo("Constructing neighbor joining tree...")
+        if verbose:
+            typer.echo("Constructing neighbor joining tree...")
         tree, branch_lengths = nj.neighbor_joining(pw_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
@@ -662,20 +668,27 @@ class StructureMultiple:
             )
             self.final_consensus_weights.append(mean_weights)
 
-        print(f"Done {tree.shape[0]}")
-        #         with typer.progressbar(
-        #                 range(0, self.tree.shape[0] - 1, 2), label="Aligning"
-        #         ) as progress:
-        for x in range(0, self.tree.shape[0] - 1, 2):
-            if x % 50 == 0:
-                print(f"Finished {x}")
-            node_1, node_2, node_int = (
-                self.tree[x, 0],
-                self.tree[x + 1, 0],
-                self.tree[x, 1],
-            )
-            assert self.tree[x + 1, 1] == node_int
-            make_intermediate_node(node_1, node_2, node_int)
+        if verbose:
+            with typer.progressbar(
+                    range(0, self.tree.shape[0] - 1, 2), label="Aligning"
+            ) as progress:
+                for x in progress:
+                    node_1, node_2, node_int = (
+                        self.tree[x, 0],
+                        self.tree[x + 1, 0],
+                        self.tree[x, 1],
+                    )
+                    assert self.tree[x + 1, 1] == node_int
+                    make_intermediate_node(node_1, node_2, node_int)
+        else:
+            for x in range(0, self.tree.shape[0] - 1, 2):
+                node_1, node_2, node_int = (
+                    self.tree[x, 0],
+                    self.tree[x + 1, 0],
+                    self.tree[x, 1],
+                )
+                assert self.tree[x + 1, 1] == node_int
+                make_intermediate_node(node_1, node_2, node_int)
 
         node_1, node_2 = self.tree[-1, 0], self.tree[-1, 1]
         make_intermediate_node(node_1, node_2, "final")
@@ -701,23 +714,26 @@ class StructureMultiple:
 
     def write_files(
             self, write_fasta, write_pdb, write_features, write_class, only_dssp=True, num_threads=4,
+            verbose: bool = False
     ):
-        if any((write_fasta, write_pdb, write_pdb, write_class)):
+        if verbose and any((write_fasta, write_pdb, write_pdb, write_class)):
             typer.echo("Writing files...")
         if write_fasta:
             fasta_file = self.output_folder / "result.fasta"
             self.write_alignment(fasta_file)
-            typer.echo(
-                f"FASTA file: {typer.style(str(fasta_file), fg=typer.colors.GREEN)}",
-            )
+            if verbose:
+                typer.echo(
+                    f"FASTA file: {typer.style(str(fasta_file), fg=typer.colors.GREEN)}",
+                )
         if write_pdb:
             pdb_folder = self.output_folder / "superposed_pdbs"
             if not pdb_folder.exists():
                 pdb_folder.mkdir()
             self.write_superposed_pdbs(pdb_folder)
-            typer.echo(
-                f"Superposed PDB files: {typer.style(str(pdb_folder), fg=typer.colors.GREEN)}"
-            )
+            if verbose:
+                typer.echo(
+                    f"Superposed PDB files: {typer.style(str(pdb_folder), fg=typer.colors.GREEN)}"
+                )
         if write_features:
             dssp_dir = self.output_folder / ".caretta_tmp"
             if not dssp_dir.exists():
@@ -726,16 +742,18 @@ class StructureMultiple:
             self.features = self.get_aligned_features(str(dssp_dir), only_dssp=only_dssp, num_threads=num_threads)
             with open(feature_file, "wb") as f:
                 pickle.dump(self.features, f)
-            typer.echo(
-                f"Aligned features: {typer.style(str(feature_file), fg=typer.colors.GREEN)}"
-            )
+            if verbose:
+                typer.echo(
+                    f"Aligned features: {typer.style(str(feature_file), fg=typer.colors.GREEN)}"
+                )
         if write_class:
             class_file = self.output_folder / "result_class.pkl"
             with open(class_file, "wb") as f:
                 pickle.dump(self, f)
-            typer.echo(
-                f"Class file: {typer.style(str(class_file), fg=typer.colors.GREEN)}"
-            )
+            if verbose:
+                typer.echo(
+                    f"Class file: {typer.style(str(class_file), fg=typer.colors.GREEN)}"
+                )
 
     def write_alignment(self, filename, alignments: dict = None):
         """

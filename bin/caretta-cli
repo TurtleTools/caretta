@@ -79,6 +79,11 @@ def align(
         "--class",
         help="write StructureMultiple class with intermediate structures and tree to pickle file",
     ),
+    verbose: bool = typer.Option(
+        True,
+        "--verbose", "-v",
+        help="Control verbosity",
+    ),
 ):
     """
     Align protein structures using Caretta.
@@ -102,6 +107,7 @@ def align(
         features,
         only_dssp,
         write_class,
+        verbose
     )
 
 
