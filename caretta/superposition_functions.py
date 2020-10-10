@@ -13,16 +13,18 @@ returns score, superposed_coords_1, superposed_coords_2
 
 
 def dtw_svd_superpose_function(
-    coords_1,
-    coords_2,
-    parameters: dict,
+    coords_1, coords_2, parameters: dict,
 ):
     """
     Assumes coords_1 and coords_2 are already in a well-superposed state,
     runs DTW alignment and then superposes with Kabsch on the aligning positions
     """
     score_matrix = score_functions.make_score_matrix(
-        coords_1, coords_2, score_functions.get_caretta_score, parameters["gamma"], normalized=False
+        coords_1,
+        coords_2,
+        score_functions.get_caretta_score,
+        parameters["gamma"],
+        normalized=False,
     )
     _, coords_1, coords_2, common_coords_1, common_coords_2 = _align_and_superpose(
         coords_1,
@@ -33,16 +35,18 @@ def dtw_svd_superpose_function(
     )
     return (
         score_functions.get_total_score(
-            common_coords_1, common_coords_2, score_functions.get_caretta_score, parameters["gamma"], False
+            common_coords_1,
+            common_coords_2,
+            score_functions.get_caretta_score,
+            parameters["gamma"],
+            False,
         ),
         coords_1,
         coords_2,
     )
 
 
-def signal_superpose_function(
-    coords_1, coords_2, parameters
-):
+def signal_superpose_function(coords_1, coords_2, parameters):
     """
     Makes initial superposition of coordinates using DTW alignment of overlapping signals
     A signal is a vector of euclidean distances of first (or last) coordinate to all others in a "size"-residue stretch
@@ -69,9 +73,7 @@ def signal_superpose_function(
         return score_last, c1_last, c2_last
 
 
-def signal_svd_superpose_function(
-    coords_1, coords_2, parameters
-):
+def signal_svd_superpose_function(coords_1, coords_2, parameters):
     """
     Uses signal_superpose followed by dtw_svd_superpose
     """
@@ -79,9 +81,7 @@ def signal_svd_superpose_function(
     return dtw_svd_superpose_function(coords_1, coords_2, parameters)
 
 
-def moment_superpose_function(
-    coords_1, coords_2, parameters
-):
+def moment_superpose_function(coords_1, coords_2, parameters):
     """
     Uses 4 rotation/translation invariant moments for each "split_size"-mer to run DTW
     """
@@ -105,7 +105,11 @@ def moment_superpose_function(
         moments_1 = np.log1p(moments_1)
         moments_2 = np.log1p(moments_2)
     score_matrix = score_functions.make_score_matrix(
-        moments_1, moments_2, score_functions.get_caretta_score, parameters["gamma_moment"], normalized=True
+        moments_1,
+        moments_2,
+        score_functions.get_caretta_score,
+        parameters["gamma_moment"],
+        normalized=True,
     )
     score, coords_1, coords_2, _, _ = _align_and_superpose(
         coords_1,
@@ -134,16 +138,17 @@ def geometricus_superpose_function(coords_1, coords_2, parameters):
             split_type=SplitType[parameters[f"split_type"]],
             split_size=parameters[f"split_size"],
             upsample_rate=parameters["upsample_rate"],
-        )]
-    embedder = GeometricusEmbedding.from_invariants(invariants,
-                                                    resolution=parameters["resolution"],
-                                                    protein_keys=["name1", "name2"])
+        ),
+    ]
+    embedder = GeometricusEmbedding.from_invariants(
+        invariants, resolution=parameters["resolution"], protein_keys=["name1", "name2"]
+    )
     score_matrix = score_functions.make_score_matrix(
         np.array(embedder.proteins_to_shapemers["name1"]),
         np.array(embedder.proteins_to_shapemers["name2"]),
         score_functions.get_caretta_score,
         gamma=parameters["gamma"],
-        normalized=False
+        normalized=False,
     )
     score, coords_1, coords_2, _, _ = _align_and_superpose(
         coords_1,
@@ -155,9 +160,7 @@ def geometricus_superpose_function(coords_1, coords_2, parameters):
     return score, coords_1, coords_2
 
 
-def geometricus_svd_superpose_function(
-    coords_1, coords_2, parameters
-):
+def geometricus_svd_superpose_function(coords_1, coords_2, parameters):
     """
     Uses moment_multiple_superpose followed by dtw_svd_superpose
     """
@@ -167,9 +170,7 @@ def geometricus_svd_superpose_function(
     return dtw_svd_superpose_function(coords_1, coords_2, parameters)
 
 
-def moment_multiple_superpose_function(
-    coords_1, coords_2, parameters
-):
+def moment_multiple_superpose_function(coords_1, coords_2, parameters):
     """
     Uses 4 rotation/translation invariant moments for each "split_size"-mer with different fragmentation approaches to run DTW
     """
@@ -200,7 +201,11 @@ def moment_multiple_superpose_function(
     moments_1 = sum(moments_1)
     moments_2 = sum(moments_2)
     score_matrix = score_functions.make_score_matrix(
-        moments_1, moments_2, score_functions.get_caretta_score, gamma=parameters["gamma_moment"], normalized=True
+        moments_1,
+        moments_2,
+        score_functions.get_caretta_score,
+        gamma=parameters["gamma_moment"],
+        normalized=True,
     )
     score, coords_1, coords_2, _, _ = _align_and_superpose(
         coords_1,
@@ -212,9 +217,7 @@ def moment_multiple_superpose_function(
     return score, coords_1, coords_2
 
 
-def moment_multiple_svd_superpose_function(
-    coords_1, coords_2, parameters
-):
+def moment_multiple_svd_superpose_function(coords_1, coords_2, parameters):
     """
     Uses moment_multiple_superpose followed by dtw_svd_superpose
     """
@@ -224,9 +227,7 @@ def moment_multiple_svd_superpose_function(
     return dtw_svd_superpose_function(coords_1, coords_2, parameters)
 
 
-def moment_svd_superpose_function(
-    coords_1, coords_2, parameters
-):
+def moment_svd_superpose_function(coords_1, coords_2, parameters):
     """
     Uses moment_superpose followed by dtw_svd_superpose
     """
@@ -343,7 +344,11 @@ def _signal_superpose_index(
         signals_2[x] = _make_signal_index(coords_2[i : i + size], index)
         middles_2[x] = coords_2[i + index]
     score_matrix = score_functions.make_score_matrix(
-        signals_1, signals_2, score_functions.get_signal_score, gamma=0.1, normalized=False
+        signals_1,
+        signals_2,
+        score_functions.get_signal_score,
+        gamma=0.1,
+        normalized=False,
     )
     dtw_1, dtw_2, score = dtw.dtw_align(
         score_matrix, gap_open_penalty, gap_extend_penalty
