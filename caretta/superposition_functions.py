@@ -1,6 +1,6 @@
 import numba as nb
 import numpy as np
-from geometricus import MomentInvariants, SplitType, GeometricusEmbedding
+from geometricus import MomentInvariants, SplitType, GeometricusEmbedding, MomentType
 from caretta import dynamic_time_warping as dtw, score_functions, helper
 
 """
@@ -87,12 +87,27 @@ def moment_superpose_function(coords_1, coords_2, parameters):
     """
     if "upsample_rate" not in parameters:
         parameters["upsample_rate"] = 10
+    if "moment_types" not in parameters:
+        parameters["moment_types"] = ["O_3", "O_4", "O_5", "F"]
+    if "scale" not in parameters:
+        parameters["scale"] = True
+    if "gamma_moment" not in parameters:
+        parameters["gamma_moment"] = 0.6
+    if "gamma" not in parameters:
+        parameters["gamma"] = 0.03
+    if "gap_open_penalty" not in parameters:
+        parameters["gap_open_penalty"] = 0.0
+    if "gap_extend_penalty" not in parameters:
+        parameters["gap_extend_penalty"] = 0.0
+
+    moment_types = [MomentType[x] for x in parameters["moment_types"]]
     moments_1 = MomentInvariants.from_coordinates(
         "name",
         coords_1,
         split_type=SplitType[parameters["split_type"]],
         split_size=parameters["split_size"],
         upsample_rate=parameters["upsample_rate"],
+        moment_types=moment_types,
     ).moments
     moments_2 = MomentInvariants.from_coordinates(
         "name",
@@ -100,6 +115,7 @@ def moment_superpose_function(coords_1, coords_2, parameters):
         split_type=SplitType[parameters["split_type"]],
         split_size=parameters["split_size"],
         upsample_rate=parameters["upsample_rate"],
+        moment_types=moment_types,
     ).moments
     if parameters["scale"]:
         moments_1 = np.log1p(moments_1)
@@ -176,15 +192,31 @@ def moment_multiple_superpose_function(coords_1, coords_2, parameters):
     """
     moments_1 = []
     moments_2 = []
+    if "upsample_rate" not in parameters:
+        parameters["upsample_rate"] = 10
     for i in range(parameters["num_split_types"]):
-        if "upsample_rate" not in parameters:
-            parameters["upsample_rate"] = 10
+        if f"moment_types_{i}" not in parameters:
+            parameters[f"moment_types_{i}"] = ["O_3", "O_4", "O_5", "F"]
+    if "scale" not in parameters:
+        parameters["scale"] = True
+    if "gamma_moment" not in parameters:
+        parameters["gamma_moment"] = 0.6
+    if "gamma" not in parameters:
+        parameters["gamma"] = 0.03
+    if "gap_open_penalty" not in parameters:
+        parameters["gap_open_penalty"] = 0.0
+    if "gap_extend_penalty" not in parameters:
+        parameters["gap_extend_penalty"] = 0.0
+
+    for i in range(parameters["num_split_types"]):
+        moment_types = [MomentType[x] for x in parameters[f"moment_types_{i}"]]
         moments_1_1 = MomentInvariants.from_coordinates(
             "name",
             coords_1,
             split_type=SplitType[parameters[f"split_type_{i}"]],
             split_size=parameters[f"split_size_{i}"],
             upsample_rate=parameters["upsample_rate"],
+            moment_types=moment_types,
         ).moments
         moments_2_1 = MomentInvariants.from_coordinates(
             "name",
@@ -192,21 +224,22 @@ def moment_multiple_superpose_function(coords_1, coords_2, parameters):
             split_type=SplitType[parameters[f"split_type_{i}"]],
             split_size=parameters[f"split_size_{i}"],
             upsample_rate=parameters["upsample_rate"],
+            moment_types=moment_types,
         ).moments
         if parameters["scale"]:
             moments_1_1 = np.log1p(moments_1_1)
             moments_2_1 = np.log1p(moments_2_1)
-        moments_1.append(moments_1_1 / np.max(moments_1_1, axis=0))
-        moments_2.append(moments_2_1 / np.max(moments_1_1, axis=0))
-    moments_1 = sum(moments_1)
-    moments_2 = sum(moments_2)
-    score_matrix = score_functions.make_score_matrix(
-        moments_1,
-        moments_2,
-        score_functions.get_caretta_score,
-        gamma=parameters["gamma_moment"],
-        normalized=True,
-    )
+        moments_1.append(moments_1_1)
+        moments_2.append(moments_2_1)
+    score_matrix = np.zeros((moments_1[0].shape[0], moments_2[0].shape[0]))
+    for (m_1, m_2) in zip(moments_1, moments_2):
+        score_matrix += score_functions.make_score_matrix(
+            m_1,
+            m_2,
+            score_functions.get_caretta_score,
+            gamma=parameters["gamma_moment"],
+            normalized=True,
+        )
     score, coords_1, coords_2, _, _ = _align_and_superpose(
         coords_1,
         coords_2,
