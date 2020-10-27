@@ -150,6 +150,7 @@ DEFAULT_SUPERPOSITION_PARAMETERS = {
     "split_size": 20,
     "scale": True,
     "gamma_moment": 0.6,
+    "n_iter": 3
 }
 
 
@@ -515,7 +516,7 @@ class StructureMultiple:
             )
         distance_matrix = squareform(
             pdist(
-                np.hstack((embedder.embedding for embedder in embedders)),
+                np.hstack([embedder.embedding for embedder in embedders]),
                 metric=metric,
             )
         )

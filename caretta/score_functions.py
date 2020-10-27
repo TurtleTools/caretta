@@ -2,7 +2,6 @@ import numba as nb
 import numpy as np
 from caretta import helper
 
-
 @nb.njit
 def get_caretta_score(coord_1: np.ndarray, coord_2: np.ndarray, gamma=0.03):
     """
@@ -56,10 +55,7 @@ def make_score_matrix(
     for i in range(coords_1.shape[0]):
         for j in range(coords_2.shape[0]):
             score_matrix[i, j] = score_function(coords_1[i], coords_2[j], gamma)
-    # if normalized:
-    #     return helper.normalize(score_matrix)
-    else:
-        return score_matrix
+    return score_matrix
 
 
 @nb.njit
