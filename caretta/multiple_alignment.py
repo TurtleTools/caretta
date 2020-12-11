@@ -293,11 +293,11 @@ class StructureMultiple:
             )
 
         msa_class.write_files(
-            write_fasta,
-            write_pdb,
-            write_features,
-            write_class,
-            num_threads,
+            write_fasta=write_fasta,
+            write_pdb=write_pdb,
+            write_features=write_features,
+            write_class=write_class,
+            num_threads=num_threads,
             only_dssp=only_dssp,
             verbose=verbose,
         )

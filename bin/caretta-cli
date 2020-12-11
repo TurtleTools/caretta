@@ -95,19 +95,19 @@ def align(
     output = output_folder_callback(output)
     multiple_alignment.trigger_numba_compilation()
     multiple_alignment.StructureMultiple.align_from_pdb_files(
-        input_pdb,
-        gap_open_penalty,
-        gap_extend_penalty,
-        consensus_weight,
-        full,
-        output,
-        threads,
-        fasta,
-        pdb,
-        features,
-        only_dssp,
-        write_class,
-        verbose
+        input_pdb=input_pdb,
+        gap_open_penalty=gap_open_penalty,
+        gap_extend_penalty=gap_extend_penalty,
+        consensus_weight=consensus_weight,
+        full=full,
+        output_folder=output,
+        num_threads=threads,
+        write_fasta=fasta,
+        write_pdb=pdb,
+        write_features=features,
+        only_dssp=only_dssp,
+        write_class=write_class,
+        verbose=verbose
     )
 
 
