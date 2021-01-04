@@ -44,7 +44,7 @@ input_text = "Enter a Pfam ID and click on Load Structures."
 placeholder_text = "Enter a Pfam ID (e.g. PF04851.14)"
 selection_text = """Use the dropdown box to select which PDB IDs to align."""
 
-PFAM_TO_PDB = app_helper.PfamToPDB(from_file=False, limit=100)
+PFAM_TO_PDB = app_helper.PfamToPDB(from_file=True, limit=100)
 app.layout = app_layout.get_layout(
     introduction_text, input_text, placeholder_text, selection_text, SUITE, pfam_class=PFAM_TO_PDB
 )
