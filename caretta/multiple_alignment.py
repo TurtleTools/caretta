@@ -307,7 +307,7 @@ class StructureMultiple:
     def from_pdb_files(
         cls,
         input_pdb,
-        superposition_parameters,
+        superposition_parameters=DEFAULT_SUPERPOSITION_PARAMETERS,
         superposition_function=superposition_functions.moment_svd_superpose_function,
         consensus_weight=1.0,
         output_folder=Path("./caretta_results"),
