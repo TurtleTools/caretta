@@ -9,6 +9,8 @@ import prody as pd
 import typer
 from geometricus import Structure, MomentInvariants, SplitType, GeometricusEmbedding
 from scipy.spatial.distance import pdist, squareform
+from copy import deepcopy
+import arviz as az
 
 from caretta import (
     dynamic_time_warping as dtw,
@@ -18,6 +20,21 @@ from caretta import (
     feature_extraction,
     helper,
 )
+
+
+def alignment_to_numpy(alignment):
+    aln_np = {}
+    for n in alignment:
+        aln_seq = []
+        index = 0
+        for a in alignment[n]:
+            if a == "-":
+                aln_seq.append(-1)
+            else:
+                aln_seq.append(index)
+                index += 1
+        aln_np[n] = np.array(aln_seq)
+    return aln_np
 
 
 @nb.njit
@@ -150,7 +167,7 @@ DEFAULT_SUPERPOSITION_PARAMETERS = {
     "split_size": 20,
     "scale": True,
     "gamma_moment": 0.6,
-    "n_iter": 3
+    "n_iter": 3,
 }
 
 
@@ -1018,6 +1035,97 @@ class StructureMultiple:
                     self.structures[j].length,
                 )
         return pairwise_rmsd_matrix, pairwise_coverage, pairwise_tm
+
+    def get_aligned_structures(self, alignment=None):
+        if alignment is None:
+            alignment = self.alignment
+        if type(alignment[self.structures[0].name]) == str:
+            alignment = alignment_to_numpy(alignment)
+        self.superpose(alignment)
+        aligned_structures = np.zeros(
+            (len(self.structures), len(alignment[self.structures[0].name]), 3)
+        )
+        nan_3 = np.zeros(3)
+        nan_3[:] = np.nan
+        for i in range(len(self.structures)):
+            aligned_structures[i] = [
+                self.structures[i].coordinates[x] if x != -1 else nan_3
+                for x in alignment[self.structures[i].name]
+            ]
+        return aligned_structures
+
+    def get_profile_alignment(
+        self,
+        msa_class_new: StructureMultiple,
+        gap_open_penalty: float,
+        gap_extend_penalty: float,
+    ):
+        # Assumes self has already been aligned
+        msa_class_profile = deepcopy(self)
+        profile_sequence = np.arange(
+            len(msa_class_profile.alignment[msa_class_profile.structures[0].name])
+        )
+        aligned_structures = msa_class_profile.get_aligned_structures()
+        profile_coords = np.nanmean(
+            np.array(
+                [
+                    az.hdi(aligned_structures[:, i], skipna=True)
+                    for i in range(aligned_structures.shape[1])
+                ]
+            ),
+            axis=-1,
+        )
+        profile_structure = Structure(
+            "caretta_profile", aligned_structures.shape[1], profile_coords
+        )
+        alignment = msa_class_profile.make_sequence_alignment()
+        for new_structure in msa_class_new.structures:
+            msa_class = multiple_alignment.StructureMultiple(
+                [profile_structure, new_structure],
+                {
+                    "caretta_profile": profile_sequence,
+                    new_structure.name: msa_class_new.sequences[new_structure.name],
+                },
+                msa_class_profile.superposition_parameters,
+                msa_class_profile.superposition_function,
+            )
+            alignment_indices = msa_class.align(
+                None, gap_open_penalty, gap_extend_penalty, False
+            )
+            alignment = {}
+            alignment[new_structure.name] = "".join(
+                msa_class_new.sequences[new_structure.name][i] if i != -1 else "-"
+                for i in alignment_indices[new_structure.name]
+            )
+            for n in msa_class_profile.sequences:
+                if n != new_structure.name:
+                    alignment[n] = "".join(
+                        msa_class_profile.sequences[n][
+                            msa_class_profile.alignment[n][i]
+                        ]
+                        if i != -1 and msa_class_profile.alignment[n][i] != -1
+                        else "-"
+                        for i in alignment_indices["caretta_profile"]
+                    )
+            msa_class_profile.structures.append(new_structure)
+            msa_class_profile.sequences[new_structure.name] = msa_class_new.sequences[
+                new_structure.name
+            ]
+            msa_class_profile.alignment = alignment_to_numpy(alignment)
+            aligned_structures = msa_class_profile.get_aligned_structures()
+            profile_coords = np.nanmean(
+                np.array(
+                    [
+                        az.hdi(aligned_structures[:, i], skipna=True)
+                        for i in range(aligned_structures.shape[1])
+                    ]
+                ),
+                axis=-1,
+            )
+            profile_structure = Structure(
+                "caretta_profile", aligned_structures.shape[1], profile_coords
+            )
+        return alignment
 
 
 def trigger_numba_compilation():

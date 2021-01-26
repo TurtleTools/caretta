@@ -13,7 +13,8 @@ setup(
         "biopython",
         "typer",
         "pyparsing",
-        "geometricus"
+        "geometricus",
+        "arviz",
     ],
     extras_require={
         "GUI": [
