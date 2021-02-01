@@ -1056,7 +1056,7 @@ class StructureMultiple:
 
     def get_profile_alignment(
         self,
-        msa_class_new: StructureMultiple,
+        msa_class_new,
         gap_open_penalty: float,
         gap_extend_penalty: float,
     ):
