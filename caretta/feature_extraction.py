@@ -184,7 +184,10 @@ def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, force_overwrite=T
         return data
     else:
         data = {**data, **get_fluctuations(protein)}
-        data = {**data, **get_residue_depths(pdb_file)}
+        try:
+            data = {**data, **get_residue_depths(pdb_file)}
+        except RuntimeError as e:
+            print(f"Failed to calculate residue depths: {e}")
         return data
 
 
