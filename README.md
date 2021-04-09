@@ -68,7 +68,7 @@ caretta-app <host-ip> <port>
 Then go to localhost:8091/caretta in a browser window.
 
 ## Publications
-Janani Durairaj, Mehmet Akdel, Dick de Ridder, Aalt DJ can Dijk. "Fast and adaptive protein structure representations for machine learning." [Machine Learning for Structural Biology Workshop](mlsb.io), NeurIPS 2020 (https://www.mlsb.io/papers/MLSB2020_Fast_and_adaptive_protein.pdf)
+Janani Durairaj, Mehmet Akdel, Dick de Ridder, Aalt DJ can Dijk. "Fast and adaptive protein structure representations for machine learning." [Machine Learning for Structural Biology Workshop](mlsb.io), NeurIPS 2020 (https://doi.org/10.1101/2021.04.07.438777)
 
 Poster:
 ![MLSB2020.png](MLSB2020.png)
