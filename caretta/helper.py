@@ -1,4 +1,5 @@
 import subprocess
+import typing
 from typing import List, Union, Tuple
 from pathlib import Path, PosixPath
 import Bio.PDB
@@ -336,3 +337,52 @@ def parse_pdb_files_and_clean(
         pd.writePDB(output_pdb_file, pdb)
         output_pdb_files.append(output_pdb_file)
     return output_pdb_files
+
+
+def write_distance_matrix(
+    names: typing.List[str],
+    distance_matrix: np.ndarray,
+    filename: typing.Union[Path, str],
+):
+    """
+    Writes distance matrix to file in clustal format
+
+    Parameters
+    ----------
+    names
+        protein names in order
+    distance_matrix
+    filename
+    """
+    with open(filename, "w") as f:
+        f.write(f"{len(names)}\n")
+        for i in range(len(names)):
+            row = " ".join(f"{x:.4f}" for x in distance_matrix[i])
+            f.write(f"{names[i]} {row}\n")
+
+
+def read_distance_matrix(filename: typing.Union[Path, str]):
+    """
+    Read distance matrix file
+
+    Parameters
+    ----------
+    filename
+
+    Returns
+    -------
+    protein names in order, distance matrix
+    """
+    names = []
+    num_proteins = 0
+    with open(filename) as f:
+        for i, line in enumerate(f):
+            if i == 0:
+                num_proteins = int(line.strip())
+                continue
+            names.append(line.split()[0].strip().split("/")[0].strip())
+    assert len(names) == num_proteins
+    distance_matrix = np.loadtxt(
+        filename, skiprows=1, usecols=range(1, num_proteins + 1)
+    )
+    return names, distance_matrix
