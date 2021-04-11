@@ -2,6 +2,7 @@ import numba as nb
 import numpy as np
 from caretta import helper
 
+
 @nb.njit
 def get_caretta_score(coord_1: np.ndarray, coord_2: np.ndarray, gamma=0.03):
     """
