@@ -126,15 +126,13 @@ def register_callbacks(app, get_pdb_entries, suite):
                 output_folder=f"static/results_{app_helper.decompress_object(unique_id, suite)}",
             )
             if len(msa_class.structures) > 2:
-                pw_matrix = msa_class.make_pairwise_shape_matrix()
+                msa_class.pairwise_distance_matrix = msa_class.make_pairwise_shape_matrix()
                 sequence_alignment = msa_class.align(
-                    pw_matrix,
                     gap_open_penalty=gap_open_dropdown,
                     gap_extend_penalty=gap_extend_dropdown,
                 )
             else:
                 sequence_alignment = msa_class.align(
-                    pw_matrix=None,
                     gap_open_penalty=gap_open_dropdown,
                     gap_extend_penalty=gap_extend_dropdown,
                 )
@@ -143,7 +141,9 @@ def register_callbacks(app, get_pdb_entries, suite):
             dssp_dir = msa_class.output_folder / ".caretta_tmp"
             if not dssp_dir.exists():
                 dssp_dir.mkdir()
-            features = msa_class.get_aligned_features(dssp_dir, num_threads=4, only_dssp=False)
+            features = msa_class.get_aligned_features(
+                dssp_dir, num_threads=4, only_dssp=False
+            )
             caretta_class = app_helper.compress_object(msa_class, suite)
             sequence_alignment_data = app_helper.compress_object(
                 sequence_alignment, suite

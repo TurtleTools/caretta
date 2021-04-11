@@ -214,6 +214,8 @@ class StructureMultiple:
         [np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray
     ] = get_mean_coords
     consensus_weight: float = 1.0
+    pairwise_distance_matrix: typing.Union[None, np.ndarray] = None
+    reference_structure_index: typing.Union[None, int] = None
     final_structures: typing.Union[None, typing.List[Structure]] = None
     final_consensus_weights: typing.Union[None, typing.List[np.ndarray]] = None
     tree: typing.Union[None, np.ndarray] = None
@@ -294,14 +296,17 @@ class StructureMultiple:
         )
         if len(msa_class.structures) > 2:
             if full:
-                pw_matrix = msa_class.make_pairwise_dtw_matrix(
+                msa_class.pairwise_distance_matrix = msa_class.make_pairwise_dtw_matrix(
                     gap_open_penalty, gap_extend_penalty, verbose=verbose
                 )
             else:
-                pw_matrix = msa_class.make_pairwise_shape_matrix(verbose=verbose)
-            msa_class.align(
-                pw_matrix, gap_open_penalty, gap_extend_penalty, verbose=verbose
+                msa_class.pairwise_distance_matrix = msa_class.make_pairwise_shape_matrix(
+                    verbose=verbose
+                )
+            msa_class.reference_structure_index = np.argmin(
+                np.median(msa_class.pairwise_distance_matrix, axis=0)
             )
+            msa_class.align(gap_open_penalty, gap_extend_penalty, verbose=verbose)
         else:
             msa_class.align(
                 gap_open_penalty=gap_open_penalty,
@@ -600,7 +605,6 @@ class StructureMultiple:
 
     def align(
         self,
-        pw_matrix,
         gap_open_penalty,
         gap_extend_penalty,
         return_sequence: bool = True,
@@ -645,11 +649,11 @@ class StructureMultiple:
                 return self.make_sequence_alignment()
             else:
                 return self.alignment
-        assert pw_matrix is not None
-        assert pw_matrix.shape[0] == len(self.structures)
+        assert self.pairwise_distance_matrix is not None
+        assert self.pairwise_distance_matrix.shape[0] == len(self.structures)
         if verbose:
             typer.echo("Constructing neighbor joining tree...")
-        tree, branch_lengths = nj.neighbor_joining(pw_matrix)
+        tree, branch_lengths = nj.neighbor_joining(self.pairwise_distance_matrix)
         self.tree = tree
         self.branch_lengths = branch_lengths
         self.final_structures = [s for s in self.structures]
@@ -670,6 +674,7 @@ class StructureMultiple:
                 self.final_structures[n1].name,
                 self.final_structures[n2].name,
             )
+
             name_int = f"int-{n_int}"
             n1_coords = self.final_structures[n1].coordinates
             n1_weights = self.final_consensus_weights[n1]
@@ -798,7 +803,7 @@ class StructureMultiple:
             pdb_folder = self.output_folder / "superposed_pdbs"
             if not pdb_folder.exists():
                 pdb_folder.mkdir()
-            self.write_superposed_pdbs(pdb_folder)
+            self.write_superposed_pdbs(pdb_folder, verbose=verbose)
             if verbose:
                 typer.echo(
                     f"Superposed PDB files: {typer.style(str(pdb_folder), fg=typer.colors.GREEN)}"
@@ -839,9 +844,58 @@ class StructureMultiple:
                 )
                 f.write(f">{key}\n{sequence}\n")
 
-    def write_superposed_pdbs(self, output_pdb_folder, alignments: dict = None):
+    def write_superposed_pdbs(
+        self, output_pdb_folder, alignments: dict = None, verbose: bool = False
+    ):
         """
         Superposes PDBs according to alignment and writes transformed PDBs to files
+        (View with Pymol)
+
+        Parameters
+        ----------
+        output_pdb_folder
+        alignments
+        verbose
+        """
+        if alignments is None:
+            alignments = self.alignment
+        output_pdb_folder = Path(output_pdb_folder)
+        if not output_pdb_folder.exists():
+            output_pdb_folder.mkdir()
+        reference_name = self.structures[self.reference_structure_index].name
+        core_indices = np.array(
+            [
+                i
+                for i in range(len(alignments[reference_name]))
+                if -1 not in [alignments[n][i] for n in alignments]
+            ]
+        )
+        if verbose:
+            typer.echo(
+                f"{len(core_indices)} core positions in alignment of length {len(alignments[reference_name])}"
+            )
+        if len(core_indices) < len(alignments[reference_name]) // 3:
+            if verbose:
+                typer.echo(
+                    typer.style(
+                        "Core indices are < 1/3rd of alignment length, superposing using reference structure "
+                        "instead",
+                        fg=typer.colors.RED,
+                    )
+                )
+                typer.echo(
+                    typer.style(
+                        "Please inspect the distance matrix to split divergent protein groups",
+                        fg=typer.colors.RED,
+                    )
+                )
+            self.write_superposed_pdbs_reference(output_pdb_folder, alignments)
+        else:
+            self.write_superposed_pdbs_core(output_pdb_folder, alignments)
+
+    def write_superposed_pdbs_core(self, output_pdb_folder, alignments):
+        """
+        Superposes PDBs according to core indices in alignment and writes transformed PDBs to files
         (View with Pymol)
 
         Parameters
@@ -849,21 +903,19 @@ class StructureMultiple:
         alignments
         output_pdb_folder
         """
-        if alignments is None:
-            alignments = self.alignment
-        output_pdb_folder = Path(output_pdb_folder)
-        if not output_pdb_folder.exists():
-            output_pdb_folder.mkdir()
-        reference_name = self.structures[0].name
-        reference_pdb = pd.parsePDB(
-            str(self.output_folder / f"cleaned_pdb/{self.structures[0].name}.pdb")
-        )
+        reference_name = self.structures[self.reference_structure_index].name
         core_indices = np.array(
             [
                 i
                 for i in range(len(alignments[reference_name]))
                 if -1 not in [alignments[n][i] for n in alignments]
             ]
+        )
+        reference_pdb = pd.parsePDB(
+            str(
+                self.output_folder
+                / f"cleaned_pdb/{self.structures[self.reference_structure_index].name}.pdb"
+            )
         )
         aln_ref = alignments[reference_name]
         ref_coords_core = (
@@ -892,6 +944,52 @@ class StructureMultiple:
                 translation_matrix,
             ) = superposition_functions.svd_superimpose(
                 ref_coords_core, common_coords_2
+            )
+            transformation = pd.Transformation(rotation_matrix.T, translation_matrix)
+            pdb = pd.applyTransformation(transformation, pdb)
+            pd.writePDB(str(output_pdb_folder / f"{name}.pdb"), pdb)
+
+    def write_superposed_pdbs_reference(self, output_pdb_folder, alignments):
+        """
+        Superposes PDBs according to reference structure and writes transformed PDBs to files
+        (View with Pymol)
+
+        Parameters
+        ----------
+        alignments
+        output_pdb_folder
+        """
+        reference_name = self.structures[self.reference_structure_index].name
+        reference_pdb = pd.parsePDB(
+            str(
+                self.output_folder
+                / f"cleaned_pdb/{self.structures[self.reference_structure_index].name}.pdb"
+            )
+        )
+        aln_ref = alignments[reference_name]
+        reference_coords = (
+            reference_pdb[helper.get_alpha_indices(reference_pdb)]
+            .getCoords()
+            .astype(np.float64)
+        )
+        pd.writePDB(str(output_pdb_folder / f"{reference_name}.pdb"), reference_pdb)
+        for i in range(1, len(self.structures)):
+            name = self.structures[i].name
+            pdb = pd.parsePDB(
+                str(self.output_folder / f"cleaned_pdb/{self.structures[i].name}.pdb")
+            )
+            aln_name = alignments[name]
+            common_coords_1, common_coords_2 = get_common_coordinates(
+                reference_coords,
+                pdb[helper.get_alpha_indices(pdb)].getCoords().astype(np.float64),
+                aln_ref,
+                aln_name,
+            )
+            (
+                rotation_matrix,
+                translation_matrix,
+            ) = superposition_functions.svd_superimpose(
+                common_coords_1, common_coords_2
             )
             transformation = pd.Transformation(rotation_matrix.T, translation_matrix)
             pdb = pd.applyTransformation(transformation, pdb)
@@ -941,30 +1039,79 @@ class StructureMultiple:
 
     def superpose(self, alignments: dict = None):
         """
+        Superposes structures to first structure using Kabsch superposition
+        """
+        if alignments is None:
+            alignments = self.alignment
+        reference_key = self.structures[self.reference_structure_index].name
+        core_indices = np.array(
+            [
+                i
+                for i in range(len(alignments[reference_key]))
+                if "-" not in [alignments[n][i] for n in alignments]
+            ]
+        )
+        if len(core_indices) < len(alignments[reference_key]) // 3:
+            self.superpose_reference(alignments)
+        else:
+            self.superpose_core(alignments, core_indices)
+
+    def superpose_core(self, alignments: dict = None, core_indices: np.ndarray = None):
+        """
         Superposes structures to first structure according to core positions in alignment using Kabsch superposition
         """
         if alignments is None:
             alignments = self.alignment
-        reference_index = np.argmax([s.length for s in self.structures])
-        reference_key = self.structures[reference_index].name
-        # core_indices = np.array([i for i in range(len(alignments[reference_key])) if '-' not in [alignments[n][i] for n in alignments]])
+        reference_key = self.structures[self.reference_structure_index].name
+        if core_indices is None:
+            core_indices = np.array(
+                [
+                    i
+                    for i in range(len(alignments[reference_key]))
+                    if "-" not in [alignments[n][i] for n in alignments]
+                ]
+            )
         aln_ref = alignments[reference_key]
-        # ref_coords = self.structures[reference_index].coordinates[np.array([aln_ref[c] for c in core_indices])]
-        # ref_centroid = helper.nb_mean_axis_0(ref_coords)
-        # ref_coords -= ref_centroid
+        ref_coords = self.structures[self.reference_structure_index].coordinates[
+            np.array([aln_ref[c] for c in core_indices])
+        ]
+        ref_centroid = helper.nb_mean_axis_0(ref_coords)
+        ref_coords -= ref_centroid
         for i in range(len(self.structures)):
-            # if i == reference_index:
-            #    self.structures[i].coordinates -= ref_centroid
-            # else:
+            if i == self.reference_structure_index:
+                self.structures[i].coordinates -= ref_centroid
+            else:
+                aln_c = alignments[self.structures[i].name]
+                common_coords_2 = self.structures[i].coordinates[
+                    np.array([aln_c[c] for c in core_indices])
+                ]
+                (
+                    rotation_matrix,
+                    translation_matrix,
+                ) = superposition_functions.paired_svd_superpose(
+                    ref_coords, common_coords_2
+                )
+                self.structures[i].coordinates = superposition_functions.apply_rotran(
+                    self.structures[i].coordinates, rotation_matrix, translation_matrix
+                )
+
+    def superpose_reference(self, alignments: dict = None):
+        """
+        Superposes structures to first structure according to reference structure using Kabsch superposition
+        """
+        if alignments is None:
+            alignments = self.alignment
+        reference_key = self.structures[self.reference_structure_index].name
+        aln_ref = alignments[reference_key]
+        for i in range(len(self.structures)):
             aln_c = alignments[self.structures[i].name]
             common_coords_1, common_coords_2 = get_common_coordinates(
-                self.structures[reference_index].coordinates,
+                self.structures[self.reference_structure_index].coordinates,
                 self.structures[i].coordinates,
                 aln_ref,
                 aln_c,
             )
             assert common_coords_1.shape[0] > 0
-            # common_coords_2 = self.structures[i].coordinates[np.array([aln_c[c] for c in core_indices])]
             (
                 rotation_matrix,
                 translation_matrix,
@@ -1055,10 +1202,7 @@ class StructureMultiple:
         return aligned_structures
 
     def get_profile_alignment(
-        self,
-        msa_class_new,
-        gap_open_penalty: float,
-        gap_extend_penalty: float,
+        self, msa_class_new, gap_open_penalty: float, gap_extend_penalty: float,
     ):
         # Assumes self has already been aligned
         msa_class_profile = deepcopy(self)
@@ -1080,7 +1224,7 @@ class StructureMultiple:
         )
         alignment = msa_class_profile.make_sequence_alignment()
         for new_structure in msa_class_new.structures:
-            msa_class = multiple_alignment.StructureMultiple(
+            msa_class = StructureMultiple(
                 [profile_structure, new_structure],
                 {
                     "caretta_profile": profile_sequence,
@@ -1090,7 +1234,7 @@ class StructureMultiple:
                 msa_class_profile.superposition_function,
             )
             alignment_indices = msa_class.align(
-                None, gap_open_penalty, gap_extend_penalty, False
+                gap_open_penalty, gap_extend_penalty, False
             )
             alignment = {}
             alignment[new_structure.name] = "".join(
