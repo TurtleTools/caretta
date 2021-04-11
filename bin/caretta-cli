@@ -79,6 +79,11 @@ def align(
         "--class",
         help="write StructureMultiple class with intermediate structures and tree to pickle file",
     ),
+    matrix: bool = typer.Option(
+        False,
+        "--matrix",
+        help="write distance matrix to file"
+    ),
     verbose: bool = typer.Option(
         True,
         "--verbose", "-v",
@@ -107,6 +112,7 @@ def align(
         write_features=features,
         only_dssp=only_dssp,
         write_class=write_class,
+        write_matrix=matrix,
         verbose=verbose
     )
 

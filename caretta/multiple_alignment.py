@@ -238,6 +238,7 @@ class StructureMultiple:
         write_features: bool = False,
         only_dssp: bool = True,
         write_class: bool = False,
+        write_matrix: bool = False,
         verbose: bool = True,
     ):
         """
@@ -280,7 +281,11 @@ class StructureMultiple:
         write_class
             True => writes StructureMultiple class with intermediate structures and tree to pickle file (default True)
             writes to output_folder / result_class.pkl
+        write_matrix
+            True => writes distance matrix to text file (default False)
+            writes to output_folder / matrix.mat
         verbose
+            controls verbosity
 
         Returns
         -------
@@ -319,6 +324,7 @@ class StructureMultiple:
             write_pdb=write_pdb,
             write_features=write_features,
             write_class=write_class,
+            write_matrix=write_matrix,
             num_threads=num_threads,
             only_dssp=only_dssp,
             verbose=verbose,
@@ -786,11 +792,14 @@ class StructureMultiple:
         write_pdb,
         write_features,
         write_class,
+        write_matrix,
         only_dssp=True,
         num_threads=4,
         verbose: bool = False,
     ):
-        if verbose and any((write_fasta, write_pdb, write_pdb, write_class)):
+        if verbose and any(
+            (write_fasta, write_pdb, write_pdb, write_class, write_matrix)
+        ):
             typer.echo("Writing files...")
         if write_fasta:
             fasta_file = self.output_folder / "result.fasta"
@@ -829,6 +838,17 @@ class StructureMultiple:
             if verbose:
                 typer.echo(
                     f"Class file: {typer.style(str(class_file), fg=typer.colors.GREEN)}"
+                )
+        if write_matrix:
+            matrix_file = self.output_folder / "matrix.mat"
+            helper.write_distance_matrix(
+                [s.name for s in self.structures],
+                self.pairwise_distance_matrix,
+                matrix_file,
+            )
+            if verbose:
+                typer.echo(
+                    f"Distance matrix file: {typer.style(str(matrix_file), fg=typer.colors.GREEN)}"
                 )
 
     def write_alignment(self, filename, alignments: dict = None):

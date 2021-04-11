@@ -126,7 +126,9 @@ def register_callbacks(app, get_pdb_entries, suite):
                 output_folder=f"static/results_{app_helper.decompress_object(unique_id, suite)}",
             )
             if len(msa_class.structures) > 2:
-                msa_class.pairwise_distance_matrix = msa_class.make_pairwise_shape_matrix()
+                msa_class.pairwise_distance_matrix = (
+                    msa_class.make_pairwise_shape_matrix()
+                )
                 sequence_alignment = msa_class.align(
                     gap_open_penalty=gap_open_dropdown,
                     gap_extend_penalty=gap_extend_dropdown,
@@ -462,6 +464,7 @@ def register_callbacks(app, get_pdb_entries, suite):
                 write_fasta=True,
                 write_class=False,
                 write_features=False,
+                write_matrix=False,
             )
             return app_layout.get_download_string(
                 str(Path(msa_class.output_folder) / "result.fasta")
@@ -503,6 +506,7 @@ def register_callbacks(app, get_pdb_entries, suite):
                 write_fasta=False,
                 write_class=False,
                 write_features=False,
+                write_matrix=False,
             )
             output_filename = f"{msa_class.output_folder}/superposed_pdbs.zip"
             pdb_zip_file = ZipFile(output_filename, mode="w")
