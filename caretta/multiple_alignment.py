@@ -894,11 +894,11 @@ class StructureMultiple:
             typer.echo(
                 f"{len(core_indices)} core positions in alignment of length {len(alignments[reference_name])}"
             )
-        if len(core_indices) < len(alignments[reference_name]) // 3:
+        if len(core_indices) < len(alignments[reference_name]) // 2:
             if verbose:
                 typer.echo(
                     typer.style(
-                        "Core indices are < 1/3rd of alignment length, superposing using reference structure "
+                        "Core indices are < half of alignment length, superposing using reference structure "
                         "instead",
                         fg=typer.colors.RED,
                     )
@@ -1071,7 +1071,7 @@ class StructureMultiple:
                 if "-" not in [alignments[n][i] for n in alignments]
             ]
         )
-        if len(core_indices) < len(alignments[reference_key]) // 3:
+        if len(core_indices) < len(alignments[reference_key]) // 2:
             self.superpose_reference(alignments)
         else:
             self.superpose_core(alignments, core_indices)
