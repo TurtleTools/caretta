@@ -120,7 +120,7 @@ def get_gnm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
 
 
 def get_features_multiple(
-    pdb_files, dssp_dir, num_threads=20, only_dssp=True, force_overwrite=True
+    pdb_files, dssp_dir, num_threads=20, only_dssp=True, force_overwrite=True, n_modes=50
 ):
     """
     Extract features for a list of pdb_files in parallel
@@ -145,13 +145,13 @@ def get_features_multiple(
         return pool.starmap(
             get_features,
             [
-                (pdb_file, dssp_dir, only_dssp, force_overwrite)
+                (pdb_file, dssp_dir, only_dssp, force_overwrite, n_modes)
                 for pdb_file in pdb_files
             ],
         )
 
 
-def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, force_overwrite=True):
+def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, force_overwrite=True, n_modes=50):
     """
     Extract features from a pdb_file
 
@@ -183,7 +183,7 @@ def get_features(pdb_file: str, dssp_dir: str, only_dssp=True, force_overwrite=T
     if only_dssp:
         return data
     else:
-        data = {**data, **get_fluctuations(protein)}
+        data = {**data, **get_fluctuations(protein, n_modes)}
         try:
             data = {**data, **get_residue_depths(pdb_file)}
         except RuntimeError as e:
