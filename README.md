@@ -56,7 +56,64 @@ export NUMBA_NUM_THREADS=20 # change to required number of threads
 ```bash
 caretta-cli input_pdb_folder
 # e.g. caretta-cli test_data  
-# caretta-cli --help for more options
+```
+
+Options:
+```
+Usage: caretta-cli [OPTIONS] INPUT_PDB
+
+  Align protein structures using Caretta.
+
+  Writes the resulting sequence alignment and superposed PDB files to
+  "caretta_results". Optionally also outputs a set of aligned feature
+  matrices, or the python class with intermediate structures made during
+  progressive alignment.
+
+Arguments:
+  INPUT_PDB  A folder with input protein files  [required]
+
+Options:
+  -p FLOAT                        gap open penalty  [default: 1.0]
+  -e FLOAT                        gap extend penalty  [default: 0.01]
+  -c, --consensus-weight FLOAT    weight well-aligned segments to reduce gaps
+                                  in these areas  [default: 1.0]
+
+  -f, --full                      Use all vs. all pairwise alignment for
+                                  distance matrix calculation (much slower)
+                                  [default: False]
+
+  -o, --output PATH               folder to store output files  [default:
+                                  caretta_results]
+
+  --fasta / --no-fasta            write alignment in FASTA file format
+                                  [default: True]
+
+  --pdb / --no-pdb                write PDB files superposed according to
+                                  alignment  [default: True]
+
+  -t, --threads INTEGER           number of threads to use for feature
+                                  extraction  [default: 4]
+
+  --features                      extract and write aligned features as a
+                                  dictionary of NumPy arrays into a pickle
+                                  file  [default: False]
+
+  --only-dssp                     extract only DSSP features  [default: False]
+  --class                         write StructureMultiple class with
+                                  intermediate structures and tree to pickle
+                                  file  [default: False]
+
+  --matrix                        write distance matrix to file  [default:
+                                  False]
+
+  -v, --verbose                   Control verbosity  [default: True]
+  --install-completion [bash|zsh|fish|powershell|pwsh]
+                                  Install completion for the specified shell.
+  --show-completion [bash|zsh|fish|powershell|pwsh]
+                                  Show completion for the specified shell, to
+                                  copy it or customize the installation.
+
+  --help                          Show this message and exit.
 ```
 
 ### Web-application Usage (Mac and Linux only)
@@ -66,6 +123,26 @@ caretta-app <host-ip> <port>
 # e.g. caretta-app localhost 8091
 ```
 Then go to localhost:8091/caretta in a browser window.
+
+### Features
+
+* `dssp_NH_O_1_index`, `dssp_NH_O_1_energy`, `dssp_NH_O_2_index`, `dssp_NH_O_2_energy`, `dssp_O_NH_1_index`, 
+  `dssp_O_NH_1_energy`, `dssp_O_NH_2_index`, `dssp_O_NH_2_energy`: hydrogen bonds; e.g. -3,-1.4 means: if this residue is residue i then N-H of I is h-bonded to C=O of I-3 with an
+          electrostatic H-bond energy of -1.4 kcal/mol. There are two columns for each type of H-bond, to allow for bifurcated H-bonds.
+* `dssp_acc`: number of water molecules in contact with this residue *10. or residue water exposed surface in Angstrom^2.
+* `dssp_alpha`: virtual torsion angle (dihedral angle) defined by the four Cα atoms of residues I-1,I,I+1,I+2. Used to define chirality.
+* `dssp_kappa`: virtual bond angle (bend angle) defined by the three Cα atoms of residues I-2,I,I+2. Used to define bend (structure code ‘S’).
+* `dssp_phi`: IUPAC peptide backbone torsion angles.
+* `dssp_psi`: IUPAC peptide backbone torsion angles.
+* `dssp_tco`: cosine of angle between C=O of residue I and C=O of residue I-1. For α-helices, TCO is near +1, for β-sheets TCO is near -1.
+* `anm_ca`: Fluctuations of alpha carbon atoms based on an Anisotropic network model
+* `anm_cb`: Fluctuations of beta carbon atoms based on an Anisotropic network model
+* `gnm_ca`: Fluctuations of alpha carbon atoms based on a Gaussian network model
+* `gnm_cb`: Fluctuations of beta carbon atoms based on a Gaussian network model
+* `depth_ca`: Depths of alpha carbon atoms
+* `depth_cb`: Depths of beta carbon atoms
+* `depth_mean`: Mean depth of residues
+
 
 ## Publications
 Janani Durairaj, Mehmet Akdel, Dick de Ridder, Aalt DJ can Dijk. "Fast and adaptive protein structure representations for machine learning." [Machine Learning for Structural Biology Workshop](mlsb.io), NeurIPS 2020 (https://doi.org/10.1101/2021.04.07.438777)
