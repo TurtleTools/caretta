@@ -126,9 +126,7 @@ def register_callbacks(app, get_pdb_entries, suite):
                 output_folder=f"static/results_{app_helper.decompress_object(unique_id, suite)}",
             )
             if len(msa_class.structures) > 2:
-                msa_class.pairwise_distance_matrix = (
-                    msa_class.make_pairwise_shape_matrix()
-                )
+                msa_class.make_pairwise_shape_matrix()
                 sequence_alignment = msa_class.align(
                     gap_open_penalty=gap_open_dropdown,
                     gap_extend_penalty=gap_extend_dropdown,

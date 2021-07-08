@@ -301,16 +301,13 @@ class StructureMultiple:
         )
         if len(msa_class.structures) > 2:
             if full:
-                msa_class.pairwise_distance_matrix = msa_class.make_pairwise_dtw_matrix(
+                msa_class.make_pairwise_dtw_matrix(
                     gap_open_penalty, gap_extend_penalty, verbose=verbose
                 )
             else:
-                msa_class.pairwise_distance_matrix = msa_class.make_pairwise_shape_matrix(
+                msa_class.make_pairwise_shape_matrix(
                     verbose=verbose
                 )
-            msa_class.reference_structure_index = np.argmin(
-                np.median(msa_class.pairwise_distance_matrix, axis=0)
-            )
             msa_class.align(gap_open_penalty, gap_extend_penalty, verbose=verbose)
         else:
             msa_class.align(
@@ -548,7 +545,10 @@ class StructureMultiple:
                 metric=metric,
             )
         )
-        return distance_matrix
+        self.reference_structure_index = np.argmin(
+            np.median(distance_matrix, axis=0)
+        )
+        self.pairwise_distance_matrix = distance_matrix
 
     def make_pairwise_dtw_matrix(
         self,
@@ -607,7 +607,10 @@ class StructureMultiple:
                 if invert:
                     pairwise_matrix[i, j] *= -1
         pairwise_matrix += pairwise_matrix.T
-        return pairwise_matrix
+        self.reference_structure_index = np.argmin(
+            np.median(pairwise_matrix, axis=0)
+        )
+        self.pairwise_distance_matrix = pairwise_matrix
 
     def align(
         self,
