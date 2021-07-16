@@ -1,4 +1,8 @@
-<p align="center"><img src="caretta_logo.png" width="300" title="Caretta Logo"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/TurtleTools/caretta/master/caretta_logo.png" width="300" title="Caretta Logo"></p>
+
+[![PyPI version](https://badge.fury.io/py/caretta.svg)](https://badge.fury.io/py/caretta)
+[![DOI](https://zenodo.org/badge/doi/10.1016/j.csbj.2020.03.011.svg)](http://dx.doi.org/10.1016/j.csbj.2020.03.011)
+[![DOI](https://zenodo.org/badge/doi/10.1101/2021.04.07.438777.svg)](http://dx.doi.org/10.1101/2021.04.07.438777)
 
 # Caretta – A multiple protein structure alignment and feature extraction suite
 
@@ -27,20 +31,14 @@ conda install -c salilab dssp
 conda install -c bioconda msms
 ```
 
-### Download caretta
-```bash
-git clone https://github.com/TurtleTools/caretta.git
-cd caretta
-```
-
 ### Install both the command-line interface and the web-application (Mac and Linux only):
 ```bash
-pip install -e ".[GUI]"
+pip install caretta[GUI]
 ```
 
 ### Install only the command-line interface:
 ```bash
-pip install .
+pip install caretta
 ```
 
 ### Environment variables:
@@ -148,7 +146,7 @@ Then go to localhost:8091/caretta in a browser window.
 Janani Durairaj, Mehmet Akdel, Dick de Ridder, Aalt DJ can Dijk. "Fast and adaptive protein structure representations for machine learning." [Machine Learning for Structural Biology Workshop](mlsb.io), NeurIPS 2020 (https://doi.org/10.1101/2021.04.07.438777)
 
 Poster:
-![MLSB2020.png](MLSB2020.png)
+![MLSB2020.png](https://raw.githubusercontent.com/TurtleTools/caretta/master/MLSB2020.png)
 
 
 Akdel, Mehmet, Janani Durairaj, Dick de Ridder, and Aalt DJ van Dijk. "Caretta-A Multiple Protein Structure Alignment and Feature Extraction Suite." Computational and Structural Biotechnology Journal (2020). (https://doi.org/10.1016/j.csbj.2020.03.011)
