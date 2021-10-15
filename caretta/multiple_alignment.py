@@ -996,7 +996,9 @@ class StructureMultiple:
             .astype(np.float64)
         )
         pd.writePDB(str(output_pdb_folder / f"{reference_name}.pdb"), reference_pdb)
-        for i in range(1, len(self.structures)):
+        for i in range(len(self.structures)):
+            if i == self.reference_structure_index:
+                continue
             name = self.structures[i].name
             pdb = pd.parsePDB(
                 str(self.output_folder / f"cleaned_pdb/{self.structures[i].name}.pdb")
