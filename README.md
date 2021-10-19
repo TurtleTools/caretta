@@ -33,12 +33,12 @@ conda install -c bioconda msms
 
 ### Install both the command-line interface and the web-application (Mac and Linux only):
 ```bash
-pip install caretta[GUI]
+pip install "caretta[GUI] @ git+https://github.com/TurtleTools/caretta.git"
 ```
 
 ### Install only the command-line interface:
 ```bash
-pip install caretta
+pip install git+https://github.com/TurtleTools/caretta.git
 ```
 
 ### Environment variables:
