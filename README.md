@@ -11,6 +11,8 @@ Caretta is a software-suite to perform multiple protein structure alignment and 
 Visit the [demo server](http://bioinformatics.nl/caretta) to see caretta's capabilities. The server only allows alignment of up to 50 proteins at once. (This is currently down, will be back up soon!)
 The command-line tool and self-hosted web application do not have this restriction.
 
+The older, slower version of Caretta as described in https://doi.org/10.1016/j.csbj.2020.03.011 can be found at https://git.wur.nl/durai001/caretta
+
 ## Installation
 
 ### Requirements
