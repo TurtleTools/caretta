@@ -11,6 +11,7 @@ from geometricus import Structure, MomentInvariants, SplitType, GeometricusEmbed
 from sklearn.metrics import pairwise_distances
 from copy import deepcopy
 import arviz as az
+from time import time
 
 from caretta import (
     dynamic_time_warping as dtw,
@@ -291,6 +292,11 @@ class StructureMultiple:
         -------
         StructureMultiple class
         """
+        start_time = time()
+
+        def print_time():
+            elapsed = typer.style(f"{time() - start_time:.2f}s", fg=typer.colors.RED)
+            print(f"Time elapsed: {elapsed}")
         msa_class = StructureMultiple.from_pdb_files(
             input_pdb,
             superposition_parameters=DEFAULT_SUPERPOSITION_PARAMETERS,
@@ -299,6 +305,8 @@ class StructureMultiple:
             output_folder=output_folder,
             verbose=verbose,
         )
+        if verbose:
+            print_time()
         if len(msa_class.structures) > 2:
             if full:
                 msa_class.make_pairwise_dtw_matrix(
@@ -308,6 +316,8 @@ class StructureMultiple:
                 msa_class.make_pairwise_shape_matrix(
                     verbose=verbose, num_threads=num_threads
                 )
+            if verbose:
+                print_time()
             msa_class.align(gap_open_penalty, gap_extend_penalty, verbose=verbose)
         else:
             msa_class.align(
@@ -315,7 +325,8 @@ class StructureMultiple:
                 gap_extend_penalty=gap_extend_penalty,
                 verbose=verbose,
             )
-
+        if verbose:
+            print_time()
         msa_class.write_files(
             write_fasta=write_fasta,
             write_pdb=write_pdb,
@@ -326,6 +337,8 @@ class StructureMultiple:
             only_dssp=only_dssp,
             verbose=verbose,
         )
+        if verbose:
+            print_time()
         return msa_class
 
     @classmethod
