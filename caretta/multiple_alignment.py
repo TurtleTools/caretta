@@ -8,7 +8,7 @@ import numpy as np
 import prody as pd
 import typer
 from geometricus import Structure, MomentInvariants, SplitType, GeometricusEmbedding
-from scipy.spatial.distance import pdist, squareform
+from sklearn.metrics import pairwise_distances
 from copy import deepcopy
 import arviz as az
 
@@ -232,7 +232,7 @@ class StructureMultiple:
         consensus_weight: float = 1.0,
         full: bool = False,
         output_folder: typing.Union[str, Path] = Path("../caretta_results"),
-        num_threads: int = 20,
+        num_threads: int = 1,
         write_fasta: bool = False,
         write_pdb: bool = False,
         write_features: bool = False,
@@ -265,7 +265,7 @@ class StructureMultiple:
         output_folder
             default "caretta_results"
         num_threads
-            Number of threads to use for feature extraction
+            Number of threads
         write_fasta
             True => writes alignment as fasta file (default True)
             writes to output_folder / result.fasta
@@ -306,7 +306,7 @@ class StructureMultiple:
                 )
             else:
                 msa_class.make_pairwise_shape_matrix(
-                    verbose=verbose
+                    verbose=verbose, num_threads=num_threads
                 )
             msa_class.align(gap_open_penalty, gap_extend_penalty, verbose=verbose)
         else:
@@ -496,6 +496,7 @@ class StructureMultiple:
         parameters: dict = None,
         metric="braycurtis",
         verbose: bool = False,
+        num_threads: int = 1,
     ):
         """
         Makes an all vs. all matrix of distance scores between all the structures.
@@ -512,6 +513,7 @@ class StructureMultiple:
         metric
             distance metric (accepts any metric supported by scipy.spatial.distance
         verbose
+        num_threads
         Returns
         -------
         [n x n] distance matrix
@@ -539,15 +541,12 @@ class StructureMultiple:
                     protein_keys=[s.name for s in self.structures],
                 )
             )
-        distance_matrix = squareform(
-            pdist(
-                np.hstack([embedder.embedding for embedder in embedders]),
-                metric=metric,
-            )
+        distance_matrix = pairwise_distances(
+            np.hstack([embedder.embedding for embedder in embedders]),
+            metric=metric,
+            n_jobs=num_threads,
         )
-        self.reference_structure_index = np.argmin(
-            np.median(distance_matrix, axis=0)
-        )
+        self.reference_structure_index = np.argmin(np.median(distance_matrix, axis=0))
         self.pairwise_distance_matrix = distance_matrix
 
     def make_pairwise_dtw_matrix(
@@ -607,9 +606,7 @@ class StructureMultiple:
                 if invert:
                     pairwise_matrix[i, j] *= -1
         pairwise_matrix += pairwise_matrix.T
-        self.reference_structure_index = np.argmin(
-            np.median(pairwise_matrix, axis=0)
-        )
+        self.reference_structure_index = np.argmin(np.median(pairwise_matrix, axis=0))
         self.pairwise_distance_matrix = pairwise_matrix
 
     def align(
@@ -624,8 +621,6 @@ class StructureMultiple:
 
         Parameters
         ----------
-        pw_matrix
-            pairwise similarity matrix to base the neighbor joining tree on
         gap_open_penalty
         gap_extend_penalty
         return_sequence
@@ -1227,7 +1222,10 @@ class StructureMultiple:
         return aligned_structures
 
     def get_profile_alignment(
-        self, msa_class_new, gap_open_penalty: float, gap_extend_penalty: float,
+        self,
+        msa_class_new,
+        gap_open_penalty: float,
+        gap_extend_penalty: float,
     ):
         # Assumes self has already been aligned
         msa_class_profile = deepcopy(self)

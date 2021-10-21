@@ -62,7 +62,7 @@ def align(
         True, help="write PDB files superposed according to alignment"
     ),
     threads: int = typer.Option(
-        4, "--threads", "-t", help="number of threads to use for feature extraction"
+        4, "--threads", "-t", help="number of threads"
     ),
     features: bool = typer.Option(
         False,
