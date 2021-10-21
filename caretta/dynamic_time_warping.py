@@ -4,7 +4,7 @@ import numpy as np
 MIN_FLOAT64 = np.finfo(np.float64).min
 
 
-@nb.njit(cache=False, parallel=True)
+@nb.njit(cache=False)
 def _make_dtw_matrix(
     score_matrix: np.ndarray,
     gap_open_penalty: float = 0.0,
@@ -34,13 +34,13 @@ def _make_dtw_matrix(
     matrix[0, :, :] = MIN_FLOAT64
     matrix[0, 0] = 0
     backtrack = np.zeros((n + 1, m + 1, 3), dtype=np.int64)
-    for i in nb.prange(1, n + 1):
+    for i in range(1, n + 1):
         matrix[i, 0, 0] = 0
         matrix[i, 0, 1] = 0
         matrix[i, 0, 2] = MIN_FLOAT64 - gap_open_penalty
         backtrack[i, 0] = 0
 
-    for j in nb.prange(1, m + 1):
+    for j in range(1, m + 1):
         matrix[0, j, 0] = MIN_FLOAT64 - gap_open_penalty
         matrix[0, j, 1] = 0
         matrix[0, j, 2] = 0
