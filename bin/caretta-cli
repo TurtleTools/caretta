@@ -2,6 +2,7 @@
 from caretta import multiple_alignment
 from pathlib import Path
 import typer
+import prody as pd
 
 app = typer.Typer()
 
@@ -96,6 +97,7 @@ def align(
     Writes the resulting sequence alignment and superposed PDB files to "caretta_results".
     Optionally also outputs a set of aligned feature matrices, or the python class with intermediate structures made during progressive alignment.
     """
+    pd.confProDy(verbosity='none')
     input_pdb = input_folder_callback(input_pdb)
     output = output_folder_callback(output)
     multiple_alignment.trigger_numba_compilation()
