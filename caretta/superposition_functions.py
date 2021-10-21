@@ -13,7 +13,9 @@ returns score, superposed_coords_1, superposed_coords_2
 
 
 def dtw_svd_superpose_function(
-    coords_1, coords_2, parameters: dict,
+    coords_1,
+    coords_2,
+    parameters: dict,
 ):
     """
     Assumes coords_1 and coords_2 are already in a well-superposed state,

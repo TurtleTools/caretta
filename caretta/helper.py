@@ -322,7 +322,8 @@ def parse_pdb_files(input_pdb):
 
 
 def parse_pdb_files_and_clean(
-    input_pdb: str, output_pdb: Union[str, Path] = "./cleaned_pdb",
+    input_pdb: str,
+    output_pdb: Union[str, Path] = "./cleaned_pdb",
 ) -> List[Union[str, Path]]:
     if not Path(output_pdb).exists():
         Path(output_pdb).mkdir()
