@@ -1,18 +1,19 @@
 import numba as nb
-import numpy as np
+import numpy as onp
+import jax.numpy as np
+from jax import jit
 
 MIN_FLOAT64 = np.finfo(np.float64).min
 
 
-@nb.njit(cache=False)
+@jit
 def _make_dtw_matrix(
-    score_matrix: np.ndarray,
-    gap_open_penalty: float = 0.0,
-    gap_extend_penalty: float = 0.0,
+        score_matrix: np.ndarray,
+        gap_open_penalty: float = 0.0,
+        gap_extend_penalty: float = 0.0,
 ):
     """
     Make cost matrix using dynamic time warping
-
     Parameters
     ----------
     score_matrix
@@ -21,7 +22,6 @@ def _make_dtw_matrix(
         penalty for opening a (series of) gap(s)
     gap_extend_penalty
         penalty for extending an existing series of gaps
-
     Returns
     -------
     accumulated cost matrix; shape = (n, m)
@@ -30,22 +30,21 @@ def _make_dtw_matrix(
     gap_extend_penalty *= -1
     n, m = score_matrix.shape
     matrix = np.zeros((n + 1, m + 1, 3), dtype=np.float64)
-    matrix[:, 0, :] = MIN_FLOAT64
-    matrix[0, :, :] = MIN_FLOAT64
-    matrix[0, 0] = 0
+    matrix = matrix.at[:, 0, :].set(MIN_FLOAT64)
+    matrix = matrix.at[0, :, :].set(MIN_FLOAT64)
+    matrix = matrix.at[0, 0].set(0)
     backtrack = np.zeros((n + 1, m + 1, 3), dtype=np.int64)
+
     for i in range(1, n + 1):
-        matrix[i, 0, 0] = 0
-        matrix[i, 0, 1] = 0
-        matrix[i, 0, 2] = MIN_FLOAT64 - gap_open_penalty
-        backtrack[i, 0] = 0
-
+        matrix = matrix.at[i, 0, 0].set(0)
+        matrix = matrix.at[i, 0, 1].set(0)
+        matrix = matrix.at[i, 0, 2].set(MIN_FLOAT64 - gap_open_penalty)
+        backtrack = backtrack.at[i, 0].set(0)
     for j in range(1, m + 1):
-        matrix[0, j, 0] = MIN_FLOAT64 - gap_open_penalty
-        matrix[0, j, 1] = 0
-        matrix[0, j, 2] = 0
-        backtrack[0, j] = 1
-
+        matrix = matrix.at[0, j, 0].set(MIN_FLOAT64 - gap_open_penalty)
+        matrix = matrix.at[0, j, 1].set(0)
+        matrix = matrix.at[0, j, 2].set(0)
+        backtrack = backtrack.at[0, j].set(1)
     for i in range(1, n + 1):
         for j in range(1, m + 1):
             scores_lower = np.array(
@@ -55,8 +54,8 @@ def _make_dtw_matrix(
                 ]
             )
             index_lower = np.argmax(scores_lower)
-            matrix[i, j, 0] = scores_lower[index_lower]
-            backtrack[i, j, 0] = index_lower
+            matrix = matrix.at[i, j, 0].set(scores_lower[index_lower])
+            backtrack = backtrack.at[i, j, 0].set(index_lower)
 
             scores_upper = np.array(
                 [
@@ -65,8 +64,8 @@ def _make_dtw_matrix(
                 ]
             )
             index_upper = np.argmax(scores_upper)
-            matrix[i, j, 2] = scores_upper[index_upper]
-            backtrack[i, j, 2] = index_upper + 1
+            matrix = matrix.at[i, j, 2].set(scores_upper[index_upper])
+            backtrack = backtrack.at[i, j, 2].set(index_upper + 1)
 
             scores = np.array(
                 [
@@ -76,12 +75,11 @@ def _make_dtw_matrix(
                 ]
             )
             index = np.argmax(scores)
-            matrix[i, j, 1] = scores[index]
-            backtrack[i, j, 1] = index
+            matrix = matrix.at[i, j, 1].set(scores[index])
+            backtrack = backtrack.at[i, j, 1].set(index)
     return matrix, backtrack
 
-
-@nb.njit(cache=False)
+@jit
 def _get_dtw_alignment(start_direction, backtrack: np.ndarray, n1, m1):
     """
     Finds optimal warping path from a backtrack matrix
@@ -107,39 +105,39 @@ def _get_dtw_alignment(start_direction, backtrack: np.ndarray, n1, m1):
     while not (n == 0 and m == 0):
         if m == 0:
             n -= 1
-            indices_1[index] = n
-            indices_2[index] = -1
+            indices_1 = indices_1.at[index].set(n)
+            indices_2 = indices_2.at[index].set(-1)
             index += 1
         elif n == 0:
             m -= 1
-            indices_1[index] = -1
-            indices_2[index] = m
+            indices_1 = indices_1.at[index].set(-1)
+            indices_2 = indices_2.at[index].set(m)
             index += 1
         else:
             if direction == 0:
                 direction = backtrack[n, m, 0]
                 n -= 1
-                indices_1[index] = n
-                indices_2[index] = -1
+                indices_1 = indices_1.at[index].set(n)
+                indices_2 = indices_2.at[index].set(-1)
                 index += 1
             elif direction == 1:
                 direction = backtrack[n, m, 1]
                 if direction == 1:
                     n -= 1
                     m -= 1
-                    indices_1[index] = n
-                    indices_2[index] = m
+                    indices_1 = indices_1.at[index].set(n)
+                    indices_2 = indices_2.at[index].set(m)
                     index += 1
             elif direction == 2:
                 direction = backtrack[n, m, 2]
                 m -= 1
-                indices_1[index] = -1
-                indices_2[index] = m
+                indices_1 = indices_1.at[index].set(-1)
+                indices_2 = indices_2.at[index].set(m)
                 index += 1
     return indices_1[:index][::-1], indices_2[:index][::-1]
 
 
-@nb.njit
+@jit
 def dtw_align(
     score_matrix: np.ndarray,
     gap_open_penalty: float = 0.0,

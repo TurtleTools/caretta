@@ -1,9 +1,11 @@
 import numba as nb
-import numpy as np
+import numpy as onp
 from caretta import helper
+from jax import jit
+import jax.numpy as np
 
 
-@nb.njit
+@jit
 def get_caretta_score(coord_1: np.ndarray, coord_2: np.ndarray, gamma=0.03):
     """
     Gaussian (RBF) score of similarity between two coordinates
@@ -11,7 +13,7 @@ def get_caretta_score(coord_1: np.ndarray, coord_2: np.ndarray, gamma=0.03):
     return np.exp(-gamma * np.sum((coord_1 - coord_2) ** 2, axis=-1))
 
 
-@nb.njit
+@jit
 def get_signal_score(signal_1, signal_2, gamma=0.1):
     """
     Used in superposition_functions.signal_superpose_function
@@ -19,7 +21,7 @@ def get_signal_score(signal_1, signal_2, gamma=0.1):
     return np.median(np.exp(-gamma * (signal_1 - signal_2) ** 2))
 
 
-@nb.njit
+@jit
 def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
     """
     RMSD of paired coordinates = normalized square-root of sum of squares of euclidean distances
@@ -27,7 +29,7 @@ def get_rmsd(coords_1: np.ndarray, coords_2: np.ndarray) -> float:
     return np.sqrt(np.sum((coords_1 - coords_2) ** 2) / coords_1.shape[0])
 
 
-@nb.njit
+@jit
 def make_score_matrix(
     coords_1: np.ndarray, coords_2: np.ndarray, score_function, gamma, normalized=False
 ) -> np.ndarray:
@@ -59,10 +61,10 @@ def make_score_matrix(
     return score_matrix
 
 
-@nb.njit
+@jit
 def get_total_score(
     coords_1: np.ndarray, coords_2: np.ndarray, score_function, gamma, normalized=False
-) -> float:
+) -> float: # TODO: use jax scan
     """
     Get total score for a set of paired coordinates
 

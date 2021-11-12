@@ -1,5 +1,7 @@
 import numba as nb
-import numpy as np
+import numpy as onp
+import jax.numpy as np
+from jax import jit
 from geometricus import MomentInvariants, SplitType, GeometricusEmbedding, MomentType
 from caretta import dynamic_time_warping as dtw, score_functions, helper
 
@@ -118,8 +120,8 @@ def moment_superpose_function(coords_1, coords_2, parameters):
         moment_types=moment_types,
     ).moments
     if parameters["scale"]:
-        moments_1 = np.log1p(moments_1)
-        moments_2 = np.log1p(moments_2)
+        moments_1 = onp.log1p(moments_1)
+        moments_2 = onp.log1p(moments_2)
     score_matrix = score_functions.make_score_matrix(
         moments_1,
         moments_2,
@@ -160,8 +162,8 @@ def geometricus_superpose_function(coords_1, coords_2, parameters):
         invariants, resolution=parameters["resolution"], protein_keys=["name1", "name2"]
     )
     score_matrix = score_functions.make_score_matrix(
-        np.array(embedder.proteins_to_shapemers["name1"]),
-        np.array(embedder.proteins_to_shapemers["name2"]),
+        onp.array(embedder.proteins_to_shapemers["name1"]),
+        onp.array(embedder.proteins_to_shapemers["name2"]),
         score_functions.get_caretta_score,
         gamma=parameters["gamma"],
         normalized=False,
@@ -227,11 +229,11 @@ def moment_multiple_superpose_function(coords_1, coords_2, parameters):
             moment_types=moment_types,
         ).moments
         if parameters["scale"]:
-            moments_1_1 = np.log1p(moments_1_1)
-            moments_2_1 = np.log1p(moments_2_1)
+            moments_1_1 = onp.log1p(moments_1_1)
+            moments_2_1 = onp.log1p(moments_2_1)
         moments_1.append(moments_1_1)
         moments_2.append(moments_2_1)
-    score_matrix = np.zeros((moments_1[0].shape[0], moments_2[0].shape[0]))
+    score_matrix = onp.zeros((moments_1[0].shape[0], moments_2[0].shape[0]))
     for (m_1, m_2) in zip(moments_1, moments_2):
         score_matrix += score_functions.make_score_matrix(
             m_1,
@@ -268,7 +270,7 @@ def moment_svd_superpose_function(coords_1, coords_2, parameters):
     return dtw_svd_superpose_function(coords_1, coords_2, parameters)
 
 
-@nb.njit
+@jit
 def _align_and_superpose(
     coords_1, coords_2, score_matrix, gap_open_penalty, gap_extend_penalty
 ):
@@ -286,7 +288,7 @@ def _align_and_superpose(
     return score, coords_1, coords_2, common_coords_1, common_coords_2
 
 
-@nb.njit
+@jit
 def paired_svd_superpose(coords_1: np.ndarray, coords_2: np.ndarray):
     """
     Superpose paired coordinates on each other using Kabsch superposition (SVD)
@@ -311,8 +313,8 @@ def paired_svd_superpose(coords_1: np.ndarray, coords_2: np.ndarray):
     u, s, v = np.linalg.svd(correlation_matrix)
     reflect = np.linalg.det(u) * np.linalg.det(v) < 0
     if reflect:
-        s[-1] = -s[-1]
-        u[:, -1] = -u[:, -1]
+        s = s.at[-1].set(-s[-1])
+        u = u.at[:, -1].set(-u[:, -1])
     rotation_matrix = np.dot(u, v)
     translation_matrix = centroid_1 - np.dot(centroid_2, rotation_matrix)
     return rotation_matrix.astype(np.float64), translation_matrix.astype(np.float64)
@@ -359,15 +361,15 @@ def _signal_superpose_index(
 
     def _make_signal_index(coords, idx):
         centroid = coords[idx]
-        distances = np.zeros(coords.shape[0])
+        distances = onp.zeros(coords.shape[0])
         for c in range(coords.shape[0]):
-            distances[c] = np.sqrt(np.sum((coords[c] - centroid) ** 2, axis=-1))
+            distances[c] = onp.sqrt(onp.sum((coords[c] - centroid) ** 2, axis=-1))
         return distances
 
-    signals_1 = np.zeros(((coords_1.shape[0] - size) // overlap, size))
-    signals_2 = np.zeros(((coords_2.shape[0] - size) // overlap, size))
-    middles_1 = np.zeros((signals_1.shape[0], coords_1.shape[1]))
-    middles_2 = np.zeros((signals_2.shape[0], coords_2.shape[1]))
+    signals_1 = onp.zeros(((coords_1.shape[0] - size) // overlap, size))
+    signals_2 = onp.zeros(((coords_2.shape[0] - size) // overlap, size))
+    middles_1 = onp.zeros((signals_1.shape[0], coords_1.shape[1]))
+    middles_2 = onp.zeros((signals_2.shape[0], coords_2.shape[1]))
     if index == -1:
         index = size - 1
     for x, i in enumerate(range(0, signals_1.shape[0] * overlap, overlap)):
@@ -387,8 +389,8 @@ def _signal_superpose_index(
         score_matrix, gap_open_penalty, gap_extend_penalty
     )
     pos_1, pos_2 = helper.get_common_positions(dtw_1, dtw_2)
-    aln_coords_1 = np.zeros((len(pos_1), coords_1.shape[1]))
-    aln_coords_2 = np.zeros((len(pos_2), coords_2.shape[1]))
+    aln_coords_1 = onp.zeros((len(pos_1), coords_1.shape[1]))
+    aln_coords_2 = onp.zeros((len(pos_2), coords_2.shape[1]))
     for i, (p1, p2) in enumerate(zip(pos_1, pos_2)):
         aln_coords_1[i] = middles_1[p1]
         aln_coords_2[i] = middles_2[p2]
@@ -398,7 +400,7 @@ def _signal_superpose_index(
     return score, coords_1, coords_2
 
 
-@nb.njit
+@jit
 def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
     """
     Superimpose paired coordinates on each other using svd
@@ -423,14 +425,14 @@ def svd_superimpose(coords_1: np.ndarray, coords_2: np.ndarray):
     u, s, v = np.linalg.svd(correlation_matrix)
     reflect = np.linalg.det(u) * np.linalg.det(v) < 0
     if reflect:
-        s[-1] = -s[-1]
-        u[:, -1] = -u[:, -1]
+        s = s.at[-1].set(-s[-1])
+        u = u.at[:, -1].set(-u[:, -1])
     rotation_matrix = np.dot(u, v)
     translation_matrix = centroid_1 - np.dot(centroid_2, rotation_matrix)
     return rotation_matrix.astype(np.float64), translation_matrix.astype(np.float64)
 
 
-@nb.njit
+@jit
 def apply_rotran(
     coords: np.ndarray, rotation_matrix: np.ndarray, translation_matrix: np.ndarray
 ) -> np.ndarray:
@@ -450,7 +452,7 @@ def apply_rotran(
     return np.dot(coords, rotation_matrix) + translation_matrix
 
 
-@nb.njit
+@jit
 def superpose_with_pos(coords_1, coords_2, common_coords_1, common_coords_2):
     """
     Superpose two sets of un-aligned coordinates using smaller subsets of aligned coordinates

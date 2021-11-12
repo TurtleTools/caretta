@@ -4,15 +4,16 @@ from typing import List, Union, Tuple
 from pathlib import Path, PosixPath
 import Bio.PDB
 import numba as nb
-import numpy as np
+import numpy as onp
+import jax.numpy as np
+from jax import jit
 import prody as pd
 
 
 def secondary_to_array(secondary):
     return np.array(secondary, dtype="S1").view(np.int8)
 
-
-@nb.njit
+@jit
 def get_common_positions(aln_array_1, aln_array_2):
     """
     Return positions where neither alignment has a gap (-1)
@@ -44,30 +45,30 @@ def get_common_positions(aln_array_1, aln_array_2):
     )
     return pos_1, pos_2
 
-
-@nb.njit
+@jit
 def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
     """
     Same as np.mean(array, axis=0) but njitted
     """
-    mean_array = np.zeros(array.shape[1])
-    for i in range(array.shape[1]):
-        mean_array[i] = np.mean(array[:, i])
-    return mean_array
+    # mean_array = np.zeros(array.shape[1])
+    # for i in range(array.shape[1]):
+    #     mean_array[i] = np.mean(array[:, i])
+    # return mean_array
+    return np.mean(array, axis=0)
 
-
-@nb.njit
+@jit
 def nb_std_axis_0(array: np.ndarray) -> np.ndarray:
     """
     Same as np.std(array, axis=0) but njitted
     """
-    std_array = np.zeros(array.shape[1])
-    for i in range(array.shape[1]):
-        std_array[i] = np.std(array[:, i])
-    return std_array
+    # std_array = np.zeros(array.shape[1])
+    # for i in range(array.shape[1]):
+    #     std_array[i] = np.std(array[:, i])
+    # return std_array
+    return np.std(array, axis=0)
 
 
-@nb.njit
+@jit
 def normalize(numbers):
     minv, maxv = np.min(numbers), np.max(numbers)
     return (numbers - minv) / (maxv - minv)

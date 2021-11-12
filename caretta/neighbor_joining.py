@@ -1,5 +1,7 @@
 import numba as nb
-import numpy as np
+import jax.numpy as np
+from jax import jit, vmap
+import numpy as onp
 
 
 # Neighbor joining takes as input a distance matrix specifying the distance between each pair of taxa.
@@ -13,9 +15,9 @@ import numpy as np
 #     5. Start the algorithm again, replacing the pair of joined neighbors with the new node and using the distances calculated in the previous step.
 
 
-@nb.njit
+@jit
 # @numba_cc.export('neighbor_joining', '(f64[:])')
-def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
+def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray): # TODO: port to jax..
     """
     Runs the neighbor joining algorithm on a distance matrix
     Returns guide tree as adjacency list + branch lengths
@@ -95,7 +97,7 @@ def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
 
 
 # Q matrix calculation + minimum i, j (step 1 & 2)
-@nb.njit
+@jit
 # @numba_cc.export('_find_join_nodes', '(f64[:])')
 def _find_join_nodes(distance_matrix):
     """
@@ -110,27 +112,26 @@ def _find_join_nodes(distance_matrix):
     indices (i, j) of nodes to join
     """
     n = distance_matrix.shape[0]
-    q_matrix = np.zeros((n, n))
-    q_matrix[:] = np.inf
+    q_matrix = np.zeros((n, n)).at[:].set(np.inf)
     min_ij = np.array([0, 0], dtype=np.uint64)
     min_q = np.inf
     for i in range(n):
         for j in range(n):
             if i != j:
-                q_matrix[i, j] = (
+                q_matrix = q_matrix.at[i, j].set(
                     (n - 2) * distance_matrix[i, j]
                     - np.sum(distance_matrix[i, :])
                     - np.sum(distance_matrix[j, :])
                 )
                 # q_matrix[i, j] = distance_matrix[i, j]
                 if q_matrix[i, j] < min_q:
-                    min_ij[0], min_ij[1] = i, j
+                    min_ij = min_ij.set((i, j))
                     min_q = q_matrix[i, j]
     return min_ij
 
 
 # Branch length calculation (step 3)
-@nb.njit
+@jit
 # @numba_cc.export('_find_branch_length', '(f64[:], i64, i64)')
 def _find_branch_length(distance_matrix, i, j):
     """
