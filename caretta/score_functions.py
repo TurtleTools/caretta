@@ -1,7 +1,7 @@
 import numba as nb
 import numpy as onp
 from caretta import helper
-from jax import jit
+from jax import jit, lax
 import jax.numpy as np
 
 

@@ -3,15 +3,11 @@ import typing
 from typing import List, Union, Tuple
 from pathlib import Path, PosixPath
 import Bio.PDB
-import numba as nb
-import numpy as onp
 import jax.numpy as np
+import numpy as onp
 from jax import jit
 import prody as pd
 
-
-def secondary_to_array(secondary):
-    return np.array(secondary, dtype="S1").view(np.int8)
 
 @jit
 def get_common_positions(aln_array_1, aln_array_2):
@@ -45,6 +41,7 @@ def get_common_positions(aln_array_1, aln_array_2):
     )
     return pos_1, pos_2
 
+
 @jit
 def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
     """
@@ -55,6 +52,7 @@ def nb_mean_axis_0(array: np.ndarray) -> np.ndarray:
     #     mean_array[i] = np.mean(array[:, i])
     # return mean_array
     return np.mean(array, axis=0)
+
 
 @jit
 def nb_std_axis_0(array: np.ndarray) -> np.ndarray:
@@ -152,7 +150,7 @@ def group_indices(input_list: List[int]) -> List[List[int]]:
 
 
 def clustal_msa_from_sequences(
-    sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None
+        sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None
 ):
     """
     Align sequences optionally using hmm_file as a guide
@@ -219,7 +217,7 @@ def clustal_msa_from_sequences(
 
 
 def get_sequences_from_fasta(
-    fasta_file: Union[str, Path], prune_headers: bool = True
+        fasta_file: Union[str, Path], prune_headers: bool = True
 ) -> dict:
     """
     Returns dict of accession to sequence from fasta file
@@ -323,7 +321,7 @@ def parse_pdb_files(input_pdb):
 
 
 def parse_pdb_files_and_clean(
-    input_pdb: str, output_pdb: Union[str, Path] = "./cleaned_pdb",
+        input_pdb: str, output_pdb: Union[str, Path] = "./cleaned_pdb",
 ) -> List[Union[str, Path]]:
     if not Path(output_pdb).exists():
         Path(output_pdb).mkdir()
@@ -341,9 +339,9 @@ def parse_pdb_files_and_clean(
 
 
 def write_distance_matrix(
-    names: typing.List[str],
-    distance_matrix: np.ndarray,
-    filename: typing.Union[Path, str],
+        names: typing.List[str],
+        distance_matrix: np.ndarray,
+        filename: typing.Union[Path, str],
 ):
     """
     Writes distance matrix to file in clustal format
@@ -383,7 +381,7 @@ def read_distance_matrix(filename: typing.Union[Path, str]):
                 continue
             names.append(line.split()[0].strip().split("/")[0].strip())
     assert len(names) == num_proteins
-    distance_matrix = np.loadtxt(
+    distance_matrix = onp.loadtxt(
         filename, skiprows=1, usecols=range(1, num_proteins + 1)
     )
     return names, distance_matrix
