@@ -16,7 +16,7 @@ import numpy as onp
 
 @jit
 # @numba_cc.export('neighbor_joining', '(f64[:])')
-def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray): # TODO: port to jax..
+def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
     """
     Runs the neighbor joining algorithm on a distance matrix
     Returns guide tree as adjacency list + branch lengths
@@ -48,23 +48,25 @@ def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray): #
         num_intermediate_nodes += 1
 
         # add to tree
-        tree[index] = np.array((true_indices[min_ij[0]], intermediate_node))
-        branch_lengths[index] = delta_ij_u[0]
+        tree = tree.at[index].set((true_indices[min_ij[0]], intermediate_node))
+        branch_lengths = branch_lengths.at[index].set(delta_ij_u[0])
         index += 1
-        tree[index] = np.array((true_indices[min_ij[1]], intermediate_node))
-        branch_lengths[index] = delta_ij_u[1]
+
+        tree = tree.at[index].set((true_indices[min_ij[1]], intermediate_node))
+        branch_lengths = branch_lengths.at[index].set(delta_ij_u[1])
         index += 1
 
         # Distances of remaining indices to newly created node (step 4)
         indices = np.array([i for i in range(n) if i != min_ij[0] and i != min_ij[1]])
         new_distance_matrix = np.zeros((n - 1, n - 1))
-        new_distance_matrix[1:, 1:] = distance_matrix[indices, :][:, indices]
+        new_distance_matrix = new_distance_matrix.at[1:, 1:].set(distance_matrix[indices, :][:, indices])
         for i in range(len(indices)):
-            new_distance_matrix[0, i + 1] = new_distance_matrix[i + 1, 0] = 0.5 * (
+            value = 0.5 * (
                 distance_matrix[min_ij[0], indices[i]]
                 + distance_matrix[min_ij[1], indices[i]]
                 - distance_matrix[min_ij[0], min_ij[1]]
             )
+            new_distance_matrix = new_distance_matrix.at[0, i + 1].set(value).at[i + 1, 0].set(value)
 
         # Repeat (step 5)
         distance_matrix = new_distance_matrix
@@ -78,18 +80,18 @@ def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray): #
     intermediate_node = num_intermediate_nodes + length
     num_intermediate_nodes += 1
 
-    tree[index] = np.array((true_indices[1], intermediate_node))
-    branch_lengths[index] = delta_ij_u[0]
+    tree = tree.at[index].set((true_indices[1], intermediate_node))
+    branch_lengths = branch_lengths.at[index].set(delta_ij_u[0])
+
+    index += 1
+    tree = tree.at[index].set((true_indices[2], intermediate_node))
+    branch_lengths = branch_lengths.at[index].set(delta_ij_u[1])
     index += 1
 
-    tree[index] = np.array((true_indices[2], intermediate_node))
-    branch_lengths[index] = delta_ij_u[1]
-    index += 1
-
-    tree[index] = np.array((true_indices[0], intermediate_node))
-    branch_lengths[index] = 0.5 * (
+    tree = tree.at[index].set((true_indices[0], intermediate_node))
+    branch_lengths = branch_lengths.at[index].set(0.5 * (
         distance_matrix[1, 0] + distance_matrix[2, 0] - distance_matrix[1, 2]
-    )
+    ))
     index += 1
 
     return tree[:index], branch_lengths[:index]

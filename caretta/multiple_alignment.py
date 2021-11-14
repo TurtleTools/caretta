@@ -4,14 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as onp
+import jax.numpy as np
+from jax import jit
 import prody as pd
 import typer
 from geometricus import Structure, MomentInvariants, SplitType, GeometricusEmbedding
 from scipy.spatial.distance import pdist, squareform
 from copy import deepcopy
 import arviz as az
-from jax import jit
-import jax.numpy as np
 
 from caretta import (
     dynamic_time_warping as dtw,
@@ -34,7 +34,7 @@ def alignment_to_numpy(alignment):
             else:
                 aln_seq.append(index)
                 index += 1
-        aln_np[n] = np.array(aln_seq)
+        aln_np[n] = onp.array(aln_seq)
     return aln_np
 
 
@@ -45,8 +45,8 @@ def tm_score(coords_1, coords_2, l1, l2):
     sum_1 = 0
     sum_2 = 0
     for i in range(coords_1.shape[0]):
-        sum_1 += 1 / (1 + (np.sqrt(np.sum((coords_1[i] - coords_2[i]) ** 2)) / d1))
-        sum_2 += 1 / (1 + (np.sqrt(np.sum((coords_1[i] - coords_2[i]) ** 2)) / d2))
+        sum_1 += 1 / (1 + (np.sum(coords_1[i] - coords_2[i]) / d1)**2)
+        sum_2 += 1 / (1 + (np.sum(coords_1[i] - coords_2[i]) / d2)**2)
     t1 = (1 / l1) * sum_1
     t2 = (1 / l2) * sum_2
     return max(t1, t2)
@@ -74,22 +74,22 @@ def get_mean_coords(
     mean_coords = np.zeros((aln_1.shape[0], coords_1.shape[1]))
     for i, (x, y) in enumerate(zip(aln_1, aln_2)):
         if x == -1:
-            mean_coords[i] = coords_2[y]
+            mean_coords = mean_coords.at[i].set(coords_2[y])
         elif y == -1:
-            mean_coords[i] = coords_1[x]
+            mean_coords = mean_coords.at[i].set(coords_2[x])
         else:
-            mean_coords[i] = np.array(
+            mean_coords = mean_coords.at[i].set(np.array(
                 [
                     np.nanmean(np.array([coords_1[x, d], coords_2[y, d]]))
                     for d in range(coords_1.shape[1])
                 ]
-            )
+            ))
     return mean_coords
 
 
 def get_mean_weights(
-    weights_1: np.ndarray, weights_2: np.ndarray, aln_1: np.ndarray, aln_2: np.ndarray
-) -> np.ndarray:
+    weights_1: onp.ndarray, weights_2: onp.ndarray, aln_1: onp.ndarray, aln_2: onp.ndarray
+) -> onp.ndarray:
     mean_weights = np.zeros(aln_1.shape[0])
     for i, (x, y) in enumerate(zip(aln_1, aln_2)):
         if not x == -1:
@@ -99,7 +99,7 @@ def get_mean_weights(
     return mean_weights
 
 
-@nb.njit
+@jit
 def get_pairwise_alignment(
     coords_1,
     coords_2,
@@ -966,7 +966,7 @@ class StructureMultiple:
             (
                 rotation_matrix,
                 translation_matrix,
-            ) = superposition_functions.svd_superimpose(
+            ) = superposition_functions.paired_svd_superpose(
                 ref_coords_core, common_coords_2
             )
             transformation = pd.Transformation(rotation_matrix.T, translation_matrix)
@@ -1014,7 +1014,7 @@ class StructureMultiple:
             (
                 rotation_matrix,
                 translation_matrix,
-            ) = superposition_functions.svd_superimpose(
+            ) = superposition_functions.paired_svd_superpose(
                 common_coords_1, common_coords_2
             )
             transformation = pd.Transformation(rotation_matrix.T, translation_matrix)
