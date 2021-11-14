@@ -3,7 +3,6 @@ import typing
 from typing import List, Union, Tuple
 from pathlib import Path, PosixPath
 import Bio.PDB
-import numba as nb
 import numpy as onp
 import jax.numpy as np
 from jax import jit

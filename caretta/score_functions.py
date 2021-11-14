@@ -1,4 +1,3 @@
-import numba as nb
 import numpy as onp
 from caretta import helper
 from jax import jit

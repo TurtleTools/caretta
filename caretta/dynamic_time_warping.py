@@ -1,4 +1,3 @@
-import numba as nb
 import numpy as onp
 import jax.numpy as np
 from jax import jit

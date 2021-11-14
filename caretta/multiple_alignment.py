@@ -3,14 +3,15 @@ import typing
 from dataclasses import dataclass
 from pathlib import Path
 
-import numba as nb
-import numpy as np
+import numpy as onp
 import prody as pd
 import typer
 from geometricus import Structure, MomentInvariants, SplitType, GeometricusEmbedding
 from scipy.spatial.distance import pdist, squareform
 from copy import deepcopy
 import arviz as az
+from jax import jit
+import jax.numpy as np
 
 from caretta import (
     dynamic_time_warping as dtw,
@@ -37,7 +38,7 @@ def alignment_to_numpy(alignment):
     return aln_np
 
 
-@nb.njit
+@jit
 def tm_score(coords_1, coords_2, l1, l2):
     d1 = 1.24 * (l1 - 15) ** 1 / 3 - 1.8
     d2 = 1.24 * (l2 - 15) ** 1 / 3 - 1.8
@@ -51,7 +52,7 @@ def tm_score(coords_1, coords_2, l1, l2):
     return max(t1, t2)
 
 
-@nb.njit
+@jit
 def get_common_coordinates(
     coords_1: np.ndarray, coords_2: np.ndarray, aln_1: np.ndarray, aln_2: np.ndarray
 ) -> typing.Tuple[np.ndarray, np.ndarray]:
@@ -63,7 +64,7 @@ def get_common_coordinates(
     return coords_1[pos_1], coords_2[pos_2]
 
 
-@nb.njit
+@jit
 def get_mean_coords(
     aln_1, coords_1: np.ndarray, aln_2, coords_2: np.ndarray
 ) -> np.ndarray:

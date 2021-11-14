@@ -1,4 +1,3 @@
-import numba as nb
 import numpy as onp
 import jax.numpy as np
 from jax import jit
@@ -319,8 +318,7 @@ def paired_svd_superpose(coords_1: np.ndarray, coords_2: np.ndarray):
     translation_matrix = centroid_1 - np.dot(centroid_2, rotation_matrix)
     return rotation_matrix.astype(np.float64), translation_matrix.astype(np.float64)
 
-
-@nb.njit
+@jit
 def paired_svd_superpose_with_subset(
     coords_1, coords_2, common_coords_1, common_coords_2
 ):
