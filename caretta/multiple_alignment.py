@@ -38,8 +38,8 @@ def alignment_to_numpy(alignment):
     return aln_np
 
 
-@jit
-def tm_score(coords_1, coords_2, l1, l2):
+
+def _tm_score(coords_1, coords_2, l1, l2):
     d1 = 1.24 * (l1 - 15) ** 1 / 3 - 1.8
     d2 = 1.24 * (l2 - 15) ** 1 / 3 - 1.8
     sum_1 = 0
@@ -49,8 +49,10 @@ def tm_score(coords_1, coords_2, l1, l2):
         sum_2 += 1 / (1 + (np.sum(coords_1[i] - coords_2[i]) / d2)**2)
     t1 = (1 / l1) * sum_1
     t2 = (1 / l2) * sum_2
-    return max(t1, t2)
+    res = max(float(t1), float(t2))
+    return res
 
+tm_score = jit(_tm_score, static_argnums=(2, 3))
 
 @jit
 def get_common_coordinates(
