@@ -329,7 +329,7 @@ def parse_pdb_files_and_clean(
     pdb_files = parse_pdb_files(input_pdb)
     output_pdb_files = []
     for pdb_file in pdb_files:
-        pdb = pd.parsePDB(pdb_file).select("protein")
+        pdb = pd.parsePDB(str(pdb_file)).select("protein")
         chains = pdb.getChids()
         if len(chains) and len(chains[0].strip()):
             pdb = pdb.select(f"chain {chains[0]}")
