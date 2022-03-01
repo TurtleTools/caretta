@@ -135,7 +135,7 @@ with open('caretta_results/result_features.pkl', 'rb') as f:
     protein_ids, features = pickle.load(f)
 ```
 
-The `features` dictionary is a dictionary of NumPy arrays, with the `protein_ids` defining the order of rows and the keys as follows:
+The `features` dictionary is a dictionary of NumPy arrays, with the `protein_ids` defining the order of rows, the columns being the aligned feature values, and the keys as follows:
 
 * `dssp_NH_O_1_index`, `dssp_NH_O_1_energy`, `dssp_NH_O_2_index`, `dssp_NH_O_2_energy`, `dssp_O_NH_1_index`, 
   `dssp_O_NH_1_energy`, `dssp_O_NH_2_index`, `dssp_O_NH_2_energy`: hydrogen bonds; e.g. -3,-1.4 means: if this residue is residue i then N-H of I is h-bonded to C=O of I-3 with an
