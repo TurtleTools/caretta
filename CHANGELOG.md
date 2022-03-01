@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2022-01-05
+### Fixed
+- Fixed the [issue](https://github.com/TurtleTools/caretta/issues/15) with missing output superposed pdb files
 
 ## [0.1.1] - 2021-07-16
 ### Added

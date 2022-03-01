@@ -47,8 +47,8 @@ def tm_score(coords_1, coords_2, l1, l2):
     sum_1 = 0
     sum_2 = 0
     for i in range(coords_1.shape[0]):
-        sum_1 += 1 / (1 + (np.sqrt(np.sum((coords_1[i] - coords_2[i]) ** 2)) / d1))
-        sum_2 += 1 / (1 + (np.sqrt(np.sum((coords_1[i] - coords_2[i]) ** 2)) / d2))
+        sum_1 += 1 / (1 + (np.sum(coords_1[i] - coords_2[i]) / d1)**2)
+        sum_2 += 1 / (1 + (np.sum(coords_1[i] - coords_2[i]) / d2)**2)
     t1 = (1 / l1) * sum_1
     t2 = (1 / l2) * sum_2
     return max(t1, t2)
