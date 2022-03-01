@@ -1,3 +1,6 @@
+from numpy import ndarray
+from typing import Tuple, Dict, Any, List, Union
+
 import pickle
 import typing
 from dataclasses import dataclass
@@ -825,11 +828,11 @@ class StructureMultiple:
             if not dssp_dir.exists():
                 dssp_dir.mkdir()
             feature_file = self.output_folder / "result_features.pkl"
-            self.features = self.get_aligned_features(
+            names, self.features = self.get_aligned_features(
                 str(dssp_dir), only_dssp=only_dssp, num_threads=num_threads
             )
             with open(feature_file, "wb") as f:
-                pickle.dump(self.features, f)
+                pickle.dump((names, self.features), f)
             if verbose:
                 typer.echo(
                     f"Aligned features: {typer.style(str(feature_file), fg=typer.colors.GREEN)}"
@@ -1022,9 +1025,9 @@ class StructureMultiple:
 
     def get_aligned_features(
         self, dssp_dir, num_threads, alignment: dict = None, only_dssp: bool = True
-    ) -> typing.Dict[str, np.ndarray]:
+    ) -> tuple[list[str], dict[str, ndarray]]:
         """
-        Get dict of aligned features
+        Get list of protein names and corresponding dict of aligned features
         """
         if alignment is None:
             alignment = self.make_sequence_alignment()
@@ -1060,7 +1063,7 @@ class StructureMultiple:
                     if alignment[self.structures[p].name][i] != "-"
                 ]
                 aligned_features[feature_name][p, indices] = farray
-        return aligned_features
+        return [p.name for p in self.structures], aligned_features
 
     def superpose(self, alignments: dict = None):
         """
