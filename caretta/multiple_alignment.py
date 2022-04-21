@@ -312,6 +312,7 @@ class StructureMultiple:
                 )
             msa_class.align(gap_open_penalty, gap_extend_penalty, verbose=verbose)
         else:
+            msa_class.reference_structure_index = 0
             msa_class.align(
                 gap_open_penalty=gap_open_penalty,
                 gap_extend_penalty=gap_extend_penalty,
