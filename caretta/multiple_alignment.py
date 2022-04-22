@@ -1025,7 +1025,7 @@ class StructureMultiple:
 
     def get_aligned_features(
         self, dssp_dir, num_threads, alignment: dict = None, only_dssp: bool = True
-    ) -> tuple[list[str], dict[str, ndarray]]:
+    ) -> typing.Tuple[typing.List[str], typing.Dict[str, ndarray]]:
         """
         Get list of protein names and corresponding dict of aligned features
         """
