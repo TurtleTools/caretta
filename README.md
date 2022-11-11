@@ -6,6 +6,8 @@
 
 # Caretta-shape – A multiple protein structure alignment and feature extraction suite
 
+**SHORTLY WILL RELEASE A NEW VERSION WITH SOME BUGFIXES**
+
 Caretta is a software-suite to perform multiple protein structure alignment and structure feature extraction.
 
 Visit the [demo server](http://bioinformatics.nl/caretta) to see caretta's capabilities. The server only allows alignment of up to 50 proteins at once. (This is currently down, will be back up soon!)
