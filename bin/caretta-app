@@ -49,7 +49,7 @@ app.layout = app_layout.get_layout(
 
 def get_pdb_entries_from_folder(folder):
     return [
-        app_helper.PdbEntry.from_user_input(f) for f in helper.parse_pdb_files(folder)
+        app_helper.PdbEntry.from_user_input(f) for f in helper.parse_protein_files(folder)
     ]
 
 

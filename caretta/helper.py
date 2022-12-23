@@ -7,6 +7,8 @@ import numba as nb
 import numpy as np
 import prody as pd
 
+from geometricus.protein_utility import get_structure_files, parse_structure_file
+
 
 def secondary_to_array(secondary):
     return np.array(secondary, dtype="S1").view(np.int8)
@@ -151,7 +153,7 @@ def group_indices(input_list: List[int]) -> List[List[int]]:
 
 
 def clustal_msa_from_sequences(
-    sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None
+        sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None
 ):
     """
     Align sequences optionally using hmm_file as a guide
@@ -218,7 +220,7 @@ def clustal_msa_from_sequences(
 
 
 def get_sequences_from_fasta(
-    fasta_file: Union[str, Path], prune_headers: bool = True
+        fasta_file: Union[str, Path], prune_headers: bool = True
 ) -> dict:
     """
     Returns dict of accession to sequence from fasta file
@@ -304,45 +306,28 @@ def get_beta_coordinates(residue) -> np.ndarray:
     return np.array(residue["CB"].get_coord())
 
 
-def parse_pdb_files(input_pdb):
-    if type(input_pdb) == str or type(input_pdb) == PosixPath:
-        input_pdb = Path(input_pdb)
-        if input_pdb.is_dir():
-            pdb_files = list(input_pdb.glob("*.pdb"))
-        elif input_pdb.is_file():
-            with open(input_pdb) as f:
-                pdb_files = f.read().strip().split("\n")
-        else:
-            pdb_files = str(input_pdb).split("\n")
-    else:
-        pdb_files = list(input_pdb)
-        if not Path(pdb_files[0]).is_file():
-            pdb_files = [pd.fetchPDB(pdb_name) for pdb_name in pdb_files]
-    return pdb_files
-
-
-def parse_pdb_files_and_clean(
-    input_pdb: str, output_pdb: Union[str, Path] = "./cleaned_pdb",
+def parse_protein_files_and_clean(
+        input_value: str, output_folder: Union[str, Path] = "./cleaned_pdb",
 ) -> List[Union[str, Path]]:
-    if not Path(output_pdb).exists():
-        Path(output_pdb).mkdir()
-    pdb_files = parse_pdb_files(input_pdb)
+    if not Path(output_folder).exists():
+        Path(output_folder).mkdir()
+    protein_files = get_structure_files(input_value)
     output_pdb_files = []
-    for pdb_file in pdb_files:
-        pdb = pd.parsePDB(str(pdb_file)).select("protein")
-        chains = pdb.getChids()
+    for protein_file in protein_files:
+        protein = parse_structure_file(str(protein_file)).select("protein")
+        chains = protein.getChids()
         if len(chains) and len(chains[0].strip()):
-            pdb = pdb.select(f"chain {chains[0]}")
-        output_pdb_file = str(Path(output_pdb) / f"{Path(pdb_file).stem}.pdb")
-        pd.writePDB(output_pdb_file, pdb)
+            protein = protein.select(f"chain {chains[0]}")
+        output_pdb_file = str(Path(output_folder) / f"{Path(protein_file).stem}.pdb")
+        pd.writePDB(output_pdb_file, protein)
         output_pdb_files.append(output_pdb_file)
     return output_pdb_files
 
 
 def write_distance_matrix(
-    names: typing.List[str],
-    distance_matrix: np.ndarray,
-    filename: typing.Union[Path, str],
+        names: typing.List[str],
+        distance_matrix: np.ndarray,
+        filename: typing.Union[Path, str],
 ):
     """
     Writes distance matrix to file in clustal format

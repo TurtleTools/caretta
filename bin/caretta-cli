@@ -99,8 +99,8 @@ def align(
     input_pdb = input_folder_callback(input_pdb)
     output = output_folder_callback(output)
     multiple_alignment.trigger_numba_compilation()
-    multiple_alignment.StructureMultiple.align_from_pdb_files(
-        input_pdb=input_pdb,
+    multiple_alignment.ProteinMultiple.align_from_structure_files(
+        input_files=input_pdb,
         gap_open_penalty=gap_open_penalty,
         gap_extend_penalty=gap_extend_penalty,
         consensus_weight=consensus_weight,

@@ -29,9 +29,9 @@ def empty_object(suite):
     return compress_object(np.zeros(0), suite)
 
 
-def get_estimated_time(msa_class: multiple_alignment.StructureMultiple):
-    n = len(msa_class.structures)
-    l = max(s.length for s in msa_class.structures)
+def get_estimated_time(msa_class: multiple_alignment.ProteinMultiple):
+    n = len(msa_class.proteins)
+    l = max(s.length for s in msa_class.proteins)
     func = lambda x, r: (x[0] ** 2 * r * x[1] ** 2)
     return str(datetime.timedelta(seconds=int(func((l, n), 9.14726052e-06))))
 

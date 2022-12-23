@@ -1,14 +1,14 @@
 import numba as nb
 import numpy as np
-from geometricus import MomentInvariants, SplitType, GeometricusEmbedding, MomentType
+from geometricus import MomentInvariants, SplitType, Geometricus, MomentType
 from caretta import dynamic_time_warping as dtw, score_functions, helper
 
 """
 Provides pairwise superposition functions to use in Caretta
-Each takes coords_1, coords_2, parameters as input
+Each takes vector_1, vector_2, parameters as input
     parameters is a dict with gap_open_penalty, gap_extend_penalty, gamma, and other function-specific parameters as keys
 
-returns score, superposed_coords_1, superposed_coords_2
+returns score, superposed_vector_1, superposed_vector_2
 """
 
 
@@ -16,6 +16,7 @@ def dtw_svd_superpose_function(
     coords_1, coords_2, parameters: dict,
 ):
     """
+    Superposes two sets of coordinates
     Assumes coords_1 and coords_2 are already in a well-superposed state,
     runs DTW alignment and then superposes with Kabsch on the aligning positions
     """
@@ -156,7 +157,7 @@ def geometricus_superpose_function(coords_1, coords_2, parameters):
             upsample_rate=parameters["upsample_rate"],
         ),
     ]
-    embedder = GeometricusEmbedding.from_invariants(
+    embedder = Geometricus.from_invariants(
         invariants, resolution=parameters["resolution"], protein_keys=["name1", "name2"]
     )
     score_matrix = score_functions.make_score_matrix(
