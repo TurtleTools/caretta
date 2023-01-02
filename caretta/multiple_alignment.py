@@ -480,9 +480,9 @@ def align_from_structure_files(
     if verbose:
         typer.echo(f"Found {len(pdb_files)} structure files")
     model = ShapemerLearn.load(Path(model_folder))
-    protein_moments, errors = moment_invariants.get_invariants_for_files(pdb_files,
-                                                                         n_threads=num_threads,
-                                                                         verbose=verbose)
+    protein_moments, errors = moment_invariants.get_invariants_for_structures(pdb_files,
+                                                                              n_threads=num_threads,
+                                                                              verbose=verbose)
     if verbose:
         typer.echo(f"Found {len(protein_moments)} structures with valid invariants")
 
