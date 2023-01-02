@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
+import warnings
+
+warnings.filterwarnings("ignore")
+
 from caretta import multiple_alignment
 from pathlib import Path
 import typer
+import numba as nb
 
 app = typer.Typer()
 
@@ -28,79 +33,84 @@ def positive_penalty(value: float) -> float:
 
 @app.command()
 def align(
-    input_pdb: Path = typer.Argument(
-        ..., help="A folder with input protein files", callback=input_folder_callback
-    ),
-    gap_open_penalty: float = typer.Option(
-        1.0, "-p", help="gap open penalty", callback=positive_penalty
-    ),
-    gap_extend_penalty: float = typer.Option(
-        0.01, "-e", help="gap extend penalty", callback=positive_penalty
-    ),
-    consensus_weight: float = typer.Option(
-        1.0,
-        "--consensus-weight",
-        "-c",
-        help="weight well-aligned segments to reduce gaps in these areas",
-        callback=positive_penalty,
-    ),
-    full: bool = typer.Option(
-        False,
-        "--full",
-        "-f",
-        help="Use all vs. all pairwise alignment for distance matrix calculation (much slower)",
-    ),
-    output: Path = typer.Option(
-        Path("caretta_results"),
-        "--output",
-        "-o",
-        help="folder to store output files",
-        callback=output_folder_callback,
-    ),
-    fasta: bool = typer.Option(True, help="write alignment in FASTA file format"),
-    pdb: bool = typer.Option(
-        True, help="write PDB files superposed according to alignment"
-    ),
-    threads: int = typer.Option(
-        4, "--threads", "-t", help="number of threads to use for feature extraction"
-    ),
-    features: bool = typer.Option(
-        False,
-        "--features",
-        help="extract and write aligned features as a dictionary of NumPy arrays into a pickle file",
-    ),
-    only_dssp: bool = typer.Option(
-        False,
-        "--only-dssp",
-        help="extract only DSSP features"
-    ),
-    write_class: bool = typer.Option(
-        False,
-        "--class",
-        help="write StructureMultiple class with intermediate structures and tree to pickle file",
-    ),
-    matrix: bool = typer.Option(
-        False,
-        "--matrix",
-        help="write distance matrix to file"
-    ),
-    verbose: bool = typer.Option(
-        True,
-        "--verbose", "-v",
-        help="Control verbosity",
-    ),
+        input_pdb: Path = typer.Argument(
+            ..., help="A folder with input protein files", callback=input_folder_callback
+        ),
+        model_folder: Path = typer.Argument(
+            default=Path.cwd(), help="The folder containing the Geometricus ShapemerLearn model file",
+        ),
+        gap_open_penalty: float = typer.Option(
+            1.0, "-p", help="gap open penalty", callback=positive_penalty
+        ),
+        gap_extend_penalty: float = typer.Option(
+            0.01, "-e", help="gap extend penalty", callback=positive_penalty
+        ),
+        consensus_weight: bool = typer.Option(
+            True,
+            "--consensus-weight",
+            "-c",
+            help="weight well-aligned segments to reduce gaps in these areas",
+        ),
+        full: bool = typer.Option(
+            False,
+            "--full",
+            "-f",
+            help="Use all vs. all pairwise alignment for distance matrix calculation (much slower)",
+        ),
+        output: Path = typer.Option(
+            Path("caretta_results"),
+            "--output",
+            "-o",
+            help="folder to store output files",
+            callback=output_folder_callback,
+        ),
+        fasta: bool = typer.Option(True, help="write alignment in FASTA file format"),
+        pdb: bool = typer.Option(
+            True, help="write PDB files superposed according to alignment"
+        ),
+        threads: int = typer.Option(
+            4, "--threads", "-t", help="number of threads to use"
+        ),
+        features: bool = typer.Option(
+            False,
+            "--features",
+            help="extract and write aligned features as a dictionary of NumPy arrays into a pickle file",
+        ),
+        only_dssp: bool = typer.Option(
+            False,
+            "--only-dssp",
+            help="extract only DSSP features"
+        ),
+        write_class: bool = typer.Option(
+            False,
+            "--class",
+            help="write StructureMultiple class with intermediate structures and tree to pickle file",
+        ),
+        matrix: bool = typer.Option(
+            False,
+            "--matrix",
+            help="write pre-aligned distance matrix and post-aligned RMSD, coverage and TM-score matrices to files"
+        ),
+        verbose: bool = typer.Option(
+            True,
+            "--verbose", "-v",
+            help="Control verbosity",
+        ),
 ):
     """
     Align protein structures using Caretta.
 
     Writes the resulting sequence alignment and superposed PDB files to "caretta_results".
-    Optionally also outputs a set of aligned feature matrices, or the python class with intermediate structures made during progressive alignment.
+    Optionally also outputs a set of aligned feature matrices, or the python class with intermediate structures
+    made during progressive alignment.
     """
     input_pdb = input_folder_callback(input_pdb)
     output = output_folder_callback(output)
+    nb.set_num_threads(threads)
     multiple_alignment.trigger_numba_compilation()
-    multiple_alignment.StructureMultiple.align_from_pdb_files(
-        input_pdb=input_pdb,
+    multiple_alignment.align_from_structure_files(
+        input_files=input_pdb,
+        model_folder=model_folder,
         gap_open_penalty=gap_open_penalty,
         gap_extend_penalty=gap_extend_penalty,
         consensus_weight=consensus_weight,

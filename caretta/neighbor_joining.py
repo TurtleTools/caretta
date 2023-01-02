@@ -10,7 +10,8 @@ import numpy as np
 #        These taxa are joined to a newly created node, which is connected to the central node
 #     3. Calculate the distance from each of the taxa in the pair to this new node (branch lengths).
 #     4. Calculate the distance from each of the taxa outside of this pair to the new node.
-#     5. Start the algorithm again, replacing the pair of joined neighbors with the new node and using the distances calculated in the previous step.
+#     5. Start the algorithm again, replacing the pair of joined neighbors with the new node and using the distances
+#        calculated in the previous step.
 
 
 @nb.njit
@@ -60,9 +61,9 @@ def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
         new_distance_matrix[1:, 1:] = distance_matrix[indices, :][:, indices]
         for i in range(len(indices)):
             new_distance_matrix[0, i + 1] = new_distance_matrix[i + 1, 0] = 0.5 * (
-                distance_matrix[min_ij[0], indices[i]]
-                + distance_matrix[min_ij[1], indices[i]]
-                - distance_matrix[min_ij[0], min_ij[1]]
+                    distance_matrix[min_ij[0], indices[i]]
+                    + distance_matrix[min_ij[1], indices[i]]
+                    - distance_matrix[min_ij[0], min_ij[1]]
             )
 
         # Repeat (step 5)
@@ -87,7 +88,7 @@ def neighbor_joining(distance_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
 
     tree[index] = np.array((true_indices[0], intermediate_node))
     branch_lengths[index] = 0.5 * (
-        distance_matrix[1, 0] + distance_matrix[2, 0] - distance_matrix[1, 2]
+            distance_matrix[1, 0] + distance_matrix[2, 0] - distance_matrix[1, 2]
     )
     index += 1
 
@@ -118,9 +119,9 @@ def _find_join_nodes(distance_matrix):
         for j in range(n):
             if i != j:
                 q_matrix[i, j] = (
-                    (n - 2) * distance_matrix[i, j]
-                    - np.sum(distance_matrix[i, :])
-                    - np.sum(distance_matrix[j, :])
+                        (n - 2) * distance_matrix[i, j]
+                        - np.sum(distance_matrix[i, :])
+                        - np.sum(distance_matrix[j, :])
                 )
                 # q_matrix[i, j] = distance_matrix[i, j]
                 if q_matrix[i, j] < min_q:
@@ -150,7 +151,7 @@ def _find_branch_length(distance_matrix, i, j):
     """
     n = distance_matrix.shape[0]
     delta_i_u = 0.5 * distance_matrix[i, j] + (0.5 / (n - 2)) * (
-        np.sum(distance_matrix[i, :]) - np.sum(distance_matrix[j, :])
+            np.sum(distance_matrix[i, :]) - np.sum(distance_matrix[j, :])
     )
     delta_j_u = distance_matrix[i, j] - delta_i_u
     return np.array([delta_i_u, delta_j_u])

@@ -25,6 +25,7 @@ def register_callbacks(app, get_pdb_entries, suite):
     suite
         Fernet object
     """
+
     # Function called when user inputs folder / Pfam ID and clicks "Load Structures"
     @app.callback(
         # Output
@@ -98,12 +99,12 @@ def register_callbacks(app, get_pdb_entries, suite):
         ],
     )
     def align_structures(
-        align_button,
-        user_input,
-        proteins_selection_dropdown,
-        gap_open_dropdown,
-        gap_extend_dropdown,
-        unique_id,
+            align_button,
+            user_input,
+            proteins_selection_dropdown,
+            gap_open_dropdown,
+            gap_extend_dropdown,
+            unique_id,
     ):
         if align_button and user_input and proteins_selection_dropdown:
             pdb_entries = [
@@ -120,29 +121,20 @@ def register_callbacks(app, get_pdb_entries, suite):
                     pdb_files.append(p.get_pdb()[1])
                 except (OSError, AttributeError, pyparsing.ParseException):
                     continue
-            msa_class = multiple_alignment.StructureMultiple.from_pdb_files(
+            msa_class, output_files = multiple_alignment.align_from_structure_files(
                 pdb_files,
-                multiple_alignment.DEFAULT_SUPERPOSITION_PARAMETERS,
+                model_folder="static/model",
                 output_folder=f"static/results_{app_helper.decompress_object(unique_id, suite)}",
+                gap_open_penalty=gap_open_dropdown,
+                gap_extend_penalty=gap_extend_dropdown,
             )
-            if len(msa_class.structures) > 2:
-                msa_class.make_pairwise_shape_matrix()
-                sequence_alignment = msa_class.align(
-                    gap_open_penalty=gap_open_dropdown,
-                    gap_extend_penalty=gap_extend_dropdown,
-                )
-            else:
-                sequence_alignment = msa_class.align(
-                    gap_open_penalty=gap_open_dropdown,
-                    gap_extend_penalty=gap_extend_dropdown,
-                )
-            msa_class.superpose()
+            sequence_alignment = msa_class.to_sequence_alignment()
             fasta = app_helper.to_fasta_str(sequence_alignment)
-            dssp_dir = msa_class.output_folder / ".caretta_tmp"
-            if not dssp_dir.exists():
-                dssp_dir.mkdir()
-            features = msa_class.get_aligned_features(
-                dssp_dir, num_threads=4, only_dssp=False
+            output_files.tmp_folder.mkdir(exist_ok=True)
+            features = multiple_alignment.get_aligned_features(
+                msa_class.alignment,
+                output_files.cleaned_pdb_folder,
+                output_files.tmp_folder, num_threads=4, only_dssp=False
             )
             caretta_class = app_helper.compress_object(msa_class, suite)
             sequence_alignment_data = app_helper.compress_object(
@@ -159,9 +151,10 @@ def register_callbacks(app, get_pdb_entries, suite):
                 height=300,
                 colorscale="hydrophobicity",
             )
+            proteins = multiple_alignment.superpose(msa_class.alignment, msa_class.sequences)
             structure_alignment_component = dcc.Graph(
                 figure=app_helper.scatter3D(
-                    {s.name: s.coordinates for s in msa_class.structures}
+                    {s.name: s.coordinates for s in proteins}
                 ),
                 id="scatter-plot",
             )
@@ -210,14 +203,14 @@ def register_callbacks(app, get_pdb_entries, suite):
         ],
     )
     def display_feature(
-        display_feature_button_clicked,
-        feature_selection_dropdown_value,
-        feature_alignment_data,
+            display_feature_button_clicked,
+            feature_selection_dropdown_value,
+            feature_alignment_data,
     ):
         if (
-            display_feature_button_clicked
-            and feature_selection_dropdown_value
-            and feature_alignment_data
+                display_feature_button_clicked
+                and feature_selection_dropdown_value
+                and feature_alignment_data
         ):
             feature_alignment_dict = app_helper.decompress_object(
                 feature_alignment_data, suite
@@ -285,40 +278,40 @@ def register_callbacks(app, get_pdb_entries, suite):
         ],
     )
     def update_interactive_panels(
-        scatter_plot_clickdata,
-        feature_line_clickdata,
-        feature_line_graph,
-        scatter_plot,
-        structure_alignment_selected_residue,
-        feature_alignment_selected_residue,
-        sequence_alignment_data,
+            scatter_plot_clickdata,
+            feature_line_clickdata,
+            feature_line_graph,
+            scatter_plot,
+            structure_alignment_selected_residue,
+            feature_alignment_selected_residue,
+            sequence_alignment_data,
     ):
         if feature_line_graph and scatter_plot:
             changed = None
             clickdata = None
             if (
-                feature_line_clickdata
-                and app_helper.compress_object(
-                    (
+                    feature_line_clickdata
+                    and app_helper.compress_object(
+                (
                         feature_line_clickdata["points"][0]["pointNumber"],
                         feature_line_clickdata["points"][0]["curveNumber"],
-                    ),
-                    suite,
-                )
-                != feature_alignment_selected_residue
+                ),
+                suite,
+            )
+                    != feature_alignment_selected_residue
             ):
                 clickdata = feature_line_clickdata
                 changed = "feature-panel"
             elif (
-                scatter_plot_clickdata
-                and app_helper.compress_object(
-                    (
+                    scatter_plot_clickdata
+                    and app_helper.compress_object(
+                (
                         scatter_plot_clickdata["points"][0]["pointNumber"],
                         scatter_plot_clickdata["points"][0]["curveNumber"],
-                    ),
-                    suite,
-                )
-                != structure_alignment_selected_residue
+                ),
+                suite,
+            )
+                    != structure_alignment_selected_residue
             ):
                 clickdata = scatter_plot_clickdata
                 changed = "structure-panel"
@@ -448,7 +441,7 @@ def register_callbacks(app, get_pdb_entries, suite):
         ],
     )
     def download_alignment(
-        fasta_download_button_clicked, sequence_alignment_data, caretta_class
+            fasta_download_button_clicked, sequence_alignment_data, caretta_class
     ):
         if fasta_download_button_clicked and sequence_alignment_data and caretta_class:
             sequence_alignment = app_helper.decompress_object(
@@ -489,7 +482,7 @@ def register_callbacks(app, get_pdb_entries, suite):
         ],
     )
     def download_pdb(
-        pdb_download_button_clicked, sequence_alignment_data, caretta_class
+            pdb_download_button_clicked, sequence_alignment_data, caretta_class
     ):
         if pdb_download_button_clicked and sequence_alignment_data and caretta_class:
             sequence_alignment = app_helper.decompress_object(
@@ -509,7 +502,7 @@ def register_callbacks(app, get_pdb_entries, suite):
             output_filename = f"{msa_class.output_folder}/superposed_pdbs.zip"
             pdb_zip_file = ZipFile(output_filename, mode="w")
             for pdb_file in (Path(msa_class.output_folder) / "superposed_pdbs").glob(
-                "*.pdb"
+                    "*.pdb"
             ):
                 pdb_zip_file.write(
                     str(pdb_file), arcname=f"{pdb_file.stem}{pdb_file.suffix}"
@@ -545,11 +538,11 @@ def register_callbacks(app, get_pdb_entries, suite):
         ],
     )
     def download_features(
-        export_feature_button_clicked,
-        export_all_features_button_clicked,
-        feature_selection_dropdown_value,
-        feature_alignment_data,
-        caretta_class,
+            export_feature_button_clicked,
+            export_all_features_button_clicked,
+            feature_selection_dropdown_value,
+            feature_alignment_data,
+            caretta_class,
     ):
         output_string = ""
         if feature_alignment_data and caretta_class:
@@ -557,9 +550,9 @@ def register_callbacks(app, get_pdb_entries, suite):
                 feature_alignment_data, suite
             )
             msa_class = app_helper.decompress_object(caretta_class, suite)
-            protein_names = [s.name for s in msa_class.structures]
+            protein_names = [s.name for s in msa_class.proteins]
             if (
-                export_feature_button_clicked and feature_selection_dropdown_value
+                    export_feature_button_clicked and feature_selection_dropdown_value
             ) and not export_all_features_button_clicked:
                 output_filename = f"{msa_class.output_folder}/{'-'.join(feature_selection_dropdown_value.split())}.csv"
                 app_helper.write_feature_as_tsv(
@@ -569,7 +562,7 @@ def register_callbacks(app, get_pdb_entries, suite):
                 )
                 output_string = app_layout.get_download_string(output_filename)
             elif (
-                export_all_features_button_clicked and not export_feature_button_clicked
+                    export_all_features_button_clicked and not export_feature_button_clicked
             ):
                 output_filename = f"{msa_class.output_folder}/features.zip"
                 features_zip_file = ZipFile(output_filename, mode="w")
