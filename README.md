@@ -6,8 +6,6 @@
 
 # Caretta-shape – A multiple protein structure alignment and feature extraction suite
 
-**SHORTLY WILL RELEASE A NEW VERSION WITH SOME BUGFIXES**
-
 Caretta is a software-suite to perform multiple protein structure alignment and structure feature extraction.
 
 The older, slower version of Caretta as described in https://doi.org/10.1016/j.csbj.2020.03.011 can be found
@@ -37,8 +35,6 @@ Run the following commands to install external dependencies required for feature
 This is not required if you are only using the alignment.
 
 ```bash:
-
-```bash
 conda install -c salilab dssp
 conda install -c bioconda msms
 ```
