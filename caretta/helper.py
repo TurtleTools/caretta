@@ -1,17 +1,12 @@
-import subprocess
 import typing
-from typing import List, Union, Tuple
-from pathlib import Path, PosixPath
+from typing import List, Union
+from pathlib import Path
 import Bio.PDB
 import numba as nb
 import numpy as np
 import prody as pd
 
 from geometricus.protein_utility import get_structure_files, parse_structure_file
-
-
-def secondary_to_array(secondary):
-    return np.array(secondary, dtype="S1").view(np.int8)
 
 
 @nb.njit
@@ -75,24 +70,6 @@ def normalize(numbers):
     return (numbers - minv) / (maxv - minv)
 
 
-def get_file_parts(input_filename: Union[str, Path]) -> Tuple[str, str, str]:
-    """
-    Gets directory path, name, and extension from a filename
-    Parameters
-    ----------
-    input_filename
-
-    Returns
-    -------
-    (path, name, extension)
-    """
-    input_filename = Path(input_filename)
-    path = str(input_filename.parent)
-    extension = input_filename.suffix
-    name = input_filename.stem
-    return path, name, extension
-
-
 def get_alpha_indices(protein: pd.AtomGroup) -> List[int]:
     """
     Get indices of alpha carbons of pd AtomGroup object
@@ -152,114 +129,6 @@ def group_indices(input_list: List[int]) -> List[List[int]]:
     return output_list
 
 
-def clustal_msa_from_sequences(
-        sequence_file, alignment_file, hmm_file=None, distance_matrix_file=None
-):
-    """
-    Align sequences optionally using hmm_file as a guide
-
-    Parameters
-    ----------
-    sequence_file
-    alignment_file
-    hmm_file
-    distance_matrix_file
-        Writes pairwise distance matrix into file if not None
-
-    Returns
-    -------
-
-    """
-    if hmm_file is not None:
-        if distance_matrix_file is None:
-            subprocess.check_call(
-                f"clustalo "
-                f"--output-order=input-order "
-                f"--log=log_clustal.out "
-                f"-i {sequence_file} "
-                f"--hmm-in={hmm_file} "
-                f"-o {alignment_file} "
-                f"--threads=10 --force -v",
-                shell=True,
-            )
-        else:
-            subprocess.check_call(
-                f"clustalo "
-                f"--output-order=input-order "
-                f"--log=log_clustal.out --full "
-                f"--distmat-out={distance_matrix_file} "
-                f"-i {sequence_file} "
-                f"--hmm-in={hmm_file} "
-                f"-o {alignment_file} "
-                f"--threads=10 --force -v",
-                shell=True,
-            )
-    else:
-        if distance_matrix_file is None:
-            subprocess.check_call(
-                f"clustalo "
-                f"--output-order=input-order "
-                f"--log=log_clustal.out "
-                f"-i {sequence_file} "
-                f"-o {alignment_file} "
-                f"--threads=10 --force -v",
-                shell=True,
-            )
-        else:
-            subprocess.check_call(
-                f"clustalo "
-                f"--output-order=input-order "
-                f"--log=log_clustal.out "
-                f"--full "
-                f"--distmat-out={distance_matrix_file} "
-                f"-i {sequence_file} "
-                f"-o {alignment_file} "
-                f"--threads=10 --force -v",
-                shell=True,
-            )
-
-
-def get_sequences_from_fasta(
-        fasta_file: Union[str, Path], prune_headers: bool = True
-) -> dict:
-    """
-    Returns dict of accession to sequence from fasta file
-    Parameters
-    ----------
-    fasta_file
-    prune_headers
-        only keeps accession upto first /
-
-    Returns
-    -------
-    {accession:sequence}
-    """
-    sequences = {}
-    with open(fasta_file) as f:
-        current_sequence = []
-        current_key = None
-        for line in f:
-            if not len(line.strip()):
-                continue
-            if line.startswith(">"):
-                if current_key is None:
-                    if "/" in line and prune_headers:
-                        current_key = line.split(">")[1].split("/")[0].strip()
-                    else:
-                        current_key = line.split(">")[1].strip()
-                else:
-                    sequences[current_key] = "".join(current_sequence)
-                    current_sequence = []
-                    if "/" in line and prune_headers:
-                        current_key = line.split(">")[1].split("/")[0].strip()
-                    else:
-                        current_key = line.split(">")[1].strip()
-            else:
-                current_sequence.append(line.strip())
-        sequences[current_key] = "".join(current_sequence)
-    return sequences
-
-
 def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
     """
     returns protein information from PDB file
@@ -276,7 +145,7 @@ def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
     structure Object, list of residue Objects, list of peptide Objects, sequence, sequence to residue index
     """
     if name is None:
-        (_, name, _) = get_file_parts(input_file)
+        name = Path(input_file).stem
     input_file = str(input_file)
     structure = Bio.PDB.PDBParser().get_structure(name, input_file)
     if chain is not None:
@@ -287,23 +156,6 @@ def read_pdb(input_file, name: str = None, chain: str = None) -> tuple:
     residue_dict = dict(zip(residues, range(len(residues))))
     seq_to_res_index = [residue_dict[r] for peptide in peptides for r in peptide]
     return structure, residues, peptides, sequence, seq_to_res_index
-
-
-def get_alpha_coordinates(residue) -> np.ndarray:
-    """
-    Returns alpha coordinates of BioPython residue object
-    """
-    return np.array(residue["CA"].get_coord())
-
-
-def get_beta_coordinates(residue) -> np.ndarray:
-    """
-    Returns beta coordinates of BioPython residue object
-    (alpha if Gly)
-    """
-    if residue.get_resname() == "GLY" or "CB" not in residue:
-        return get_alpha_coordinates(residue)
-    return np.array(residue["CB"].get_coord())
 
 
 def parse_protein_files_and_clean(
@@ -319,6 +171,10 @@ def parse_protein_files_and_clean(
         if len(chains) and len(chains[0].strip()):
             protein = protein.select(f"chain {chains[0]}")
         output_pdb_file = str(Path(output_folder) / f"{Path(protein_file).stem}.pdb")
+        pd.writePDB(output_pdb_file, protein)
+        protein = pd.parsePDB(output_pdb_file)
+        while len(protein.getCoordsets()) > 1:
+            protein.delCoordset(1)
         pd.writePDB(output_pdb_file, protein)
         output_pdb_files.append(output_pdb_file)
     return output_pdb_files

@@ -121,29 +121,20 @@ def register_callbacks(app, get_pdb_entries, suite):
                     pdb_files.append(p.get_pdb()[1])
                 except (OSError, AttributeError, pyparsing.ParseException):
                     continue
-            msa_class = multiple_alignment.ProteinMultiple.from_structure_files(
+            msa_class, output_files = multiple_alignment.align_from_structure_files(
                 pdb_files,
-                multiple_alignment.DEFAULT_SUPERPOSITION_PARAMETERS,
+                model_folder="static/model",
                 output_folder=f"static/results_{app_helper.decompress_object(unique_id, suite)}",
+                gap_open_penalty=gap_open_dropdown,
+                gap_extend_penalty=gap_extend_dropdown,
             )
-            if len(msa_class.proteins) > 2:
-                msa_class.make_pairwise_shape_matrix()
-                sequence_alignment = msa_class.align(
-                    gap_open_penalty=gap_open_dropdown,
-                    gap_extend_penalty=gap_extend_dropdown,
-                )
-            else:
-                sequence_alignment = msa_class.align(
-                    gap_open_penalty=gap_open_dropdown,
-                    gap_extend_penalty=gap_extend_dropdown,
-                )
-            msa_class.superpose()
+            sequence_alignment = msa_class.to_sequence_alignment()
             fasta = app_helper.to_fasta_str(sequence_alignment)
-            dssp_dir = msa_class.output_folder / ".caretta_tmp"
-            if not dssp_dir.exists():
-                dssp_dir.mkdir()
-            features = msa_class.get_aligned_features(
-                dssp_dir, num_threads=4, only_dssp=False
+            output_files.tmp_folder.mkdir(exist_ok=True)
+            features = multiple_alignment.get_aligned_features(
+                msa_class.alignment,
+                output_files.cleaned_pdb_folder,
+                output_files.tmp_folder, num_threads=4, only_dssp=False
             )
             caretta_class = app_helper.compress_object(msa_class, suite)
             sequence_alignment_data = app_helper.compress_object(
@@ -160,9 +151,10 @@ def register_callbacks(app, get_pdb_entries, suite):
                 height=300,
                 colorscale="hydrophobicity",
             )
+            proteins = multiple_alignment.superpose(msa_class.alignment, msa_class.sequences)
             structure_alignment_component = dcc.Graph(
                 figure=app_helper.scatter3D(
-                    {s.name: s.coordinates for s in msa_class.proteins}
+                    {s.name: s.coordinates for s in proteins}
                 ),
                 id="scatter-plot",
             )

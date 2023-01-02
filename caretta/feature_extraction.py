@@ -120,7 +120,7 @@ def get_gnm_fluctuations(protein: pd.AtomGroup, n_modes: int = 50):
 
 
 def get_features_multiple(
-    pdb_files, dssp_dir, num_threads=20, only_dssp=True, force_overwrite=True, n_modes=50
+        pdb_files, dssp_dir, num_threads=20, only_dssp=True, force_overwrite=True, n_modes=50
 ):
     """
     Extract features for a list of pdb_files in parallel
@@ -204,25 +204,30 @@ def get_dssp_features(protein_dssp):
     dict of secondary,
     dssp_
         NH_O_1_index, NH_O_1_energy
-            hydrogen bonds; e.g. -3,-1.4 means: if this residue is residue i then N-H of I is h-bonded to C=O of I-3 with an
-            electrostatic H-bond energy of -1.4 kcal/mol. There are two columns for each type of H-bond, to allow for bifurcated H-bonds.
+            hydrogen bonds; e.g. -3,-1.4 means: if this residue is residue i then N-H of I is h-bonded to C=O of I-3
+            with an electrostatic H-bond energy of -1.4 kcal/mol. There are two columns for each type of H-bond, to
+            allow for bifurcated H-bonds.
         NH_O_2_index, NH_O_2_energy
         O_NH_1_index, O_NH_1_energy
         O_NH_2_index, O_NH_2_energy
         acc
             number of water molecules in contact with this residue *10. or residue water exposed surface in Angstrom^2.
         alpha
-            virtual torsion angle (dihedral angle) defined by the four Cα atoms of residues I-1,I,I+1,I+2. Used to define chirality.
+            virtual torsion angle (dihedral angle) defined by the four Cα atoms of residues I-1,I,I+1,I+2.
+            Used to define chirality.
         kappa
-            virtual bond angle (bend angle) defined by the three Cα atoms of residues I-2,I,I+2. Used to define bend (structure code ‘S’).
+            virtual bond angle (bend angle) defined by the three Cα atoms of residues I-2,I,I+2.
+            Used to define bend (structure code ‘S’).
         phi
             IUPAC peptide backbone torsion angles.
         psi
             IUPAC peptide backbone torsion angles.
         tco
-            cosine of angle between C=O of residue I and C=O of residue I-1. For α-helices, TCO is near +1, for β-sheets TCO is near -1.
+            cosine of angle between C=O of residue I and C=O of residue I-1.
+            For α-helices, TCO is near +1, for β-sheets TCO is near -1.
     Ignores:
-    dssp_bp1, dssp_bp2, and dssp_sheet_label: residue number of first and second bridge partner followed by one letter sheet label
+    dssp_bp1, dssp_bp2, and dssp_sheet_label: residue number of first and second bridge partner followed
+    by one letter sheet label
     """
     dssp_ignore = ["dssp_bp1", "dssp_bp2", "dssp_sheet_label", "dssp_resnum"]
     dssp_labels = [

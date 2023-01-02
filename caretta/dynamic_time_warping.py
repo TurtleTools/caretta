@@ -33,8 +33,6 @@ def _make_dtw_matrix(
     -------
     accumulated cost matrix; shape = (n, m)
     """
-    gap_open_penalty *= -1
-    gap_extend_penalty *= -1
     n, m = len(seq1), len(seq2)
     matrix = np.zeros((n + 1, m + 1, 3), dtype=np.float64)
     matrix[:, 0, :] = MIN_FLOAT64
@@ -57,8 +55,8 @@ def _make_dtw_matrix(
         for j in range(1, m + 1):
             scores_lower = np.array(
                 [
-                    matrix[i - 1, j, 0] + gap_extend_penalty,
-                    matrix[i - 1, j, 1] + gap_open_penalty,
+                    matrix[i - 1, j, 0] - gap_extend_penalty,
+                    matrix[i - 1, j, 1] - gap_open_penalty,
                 ]
             )
             index_lower = np.argmax(scores_lower)
@@ -67,8 +65,8 @@ def _make_dtw_matrix(
 
             scores_upper = np.array(
                 [
-                    matrix[i, j - 1, 1] + gap_open_penalty,
-                    matrix[i, j - 1, 2] + gap_extend_penalty,
+                    matrix[i, j - 1, 1] - gap_open_penalty,
+                    matrix[i, j - 1, 2] - gap_extend_penalty,
                 ]
             )
             index_upper = np.argmax(scores_upper)
@@ -187,7 +185,24 @@ def dtw_align(
 
 
 @nb.njit
-def smith_waterman_score(seq1, seq2, matrix, gap=-1.):
+def dtw_align_score(seq1: np.ndarray,
+                    seq2: np.ndarray,
+                    score_matrix: np.ndarray,
+                    gap_open_penalty: float = 0.0,
+                    gap_extend_penalty: float = 0.0,
+                    ):
+    matrix, backtrack = _make_dtw_matrix(seq1, seq2,
+                                         score_matrix, gap_open_penalty, gap_extend_penalty
+                                         )
+    n = len(seq1)
+    m = len(seq2)
+    scores = np.array([matrix[n, m, 0], matrix[n, m, 1], matrix[n, m, 2]])
+    index = np.argmax(scores)
+    return scores[index]
+
+
+@nb.njit
+def smith_waterman_score(seq1, seq2, matrix, gap=0.):
     # Initialize the alignment score matrix with zeros
     rows = len(seq1) + 1
     cols = len(seq2) + 1
@@ -200,22 +215,15 @@ def smith_waterman_score(seq1, seq2, matrix, gap=-1.):
                 break
             # Calculate the score for each possible alignment
             diagonal_score = score_matrix[i - 1][j - 1] + matrix[seq1[i - 1], seq2[j - 1]]
-            left_score = score_matrix[i][j - 1] + gap
-            up_score = score_matrix[i - 1][j] + gap
+            left_score = score_matrix[i][j - 1] - gap
+            up_score = score_matrix[i - 1][j] - gap
             # Take the maximum of the three possible scores
             score_matrix[i][j] = max(0., diagonal_score, left_score, up_score)
-
-    # Find the position of the highest score in the matrix
-    max_score = 0.
-    for i in range(1, rows):
-        for j in range(1, cols):
-            if score_matrix[i][j] > max_score:
-                max_score = score_matrix[i][j]
-    return max_score
+    return np.max(score_matrix)
 
 
 @nb.njit
-def smith_waterman(seq1, seq2, score_matrix, gap=-1.):
+def smith_waterman(seq1, seq2, score_matrix, gap=0.):
     rows = len(seq1) + 1
     cols = len(seq2) + 1
     matrix = np.zeros((rows, cols))
@@ -224,8 +232,8 @@ def smith_waterman(seq1, seq2, score_matrix, gap=-1.):
         for j in range(1, cols):
             # Calculate the score for each possible alignment
             diagonal_score = matrix[i - 1][j - 1] + score_matrix[seq1[i - 1], seq2[j - 1]]
-            left_score = matrix[i][j - 1] + gap
-            up_score = matrix[i - 1][j] + gap
+            left_score = matrix[i][j - 1] - gap
+            up_score = matrix[i - 1][j] - gap
             # Take the maximum of the three possible scores
             matrix[i][j] = max(0, diagonal_score, left_score, up_score)
 
@@ -257,12 +265,12 @@ def smith_waterman(seq1, seq2, score_matrix, gap=-1.):
             align1[index] = i
             align2[index] = j
             index += 1
-        elif score == left_score + gap:
+        elif score == left_score - gap:
             j -= 1
             align1[index] = -1
             align2[index] = j
             index += 1
-        elif score == up_score + gap:
+        elif score == up_score - gap:
             i -= 1
             align1[index] = i
             align2[index] = -1

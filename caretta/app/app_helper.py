@@ -29,9 +29,9 @@ def empty_object(suite):
     return compress_object(np.zeros(0), suite)
 
 
-def get_estimated_time(msa_class: multiple_alignment.ProteinMultiple):
-    n = len(msa_class.proteins)
-    l = max(s.length for s in msa_class.proteins)
+def get_estimated_time(msa_class: multiple_alignment.MultipleAlignment):
+    n = len(msa_class.sequences)
+    l = max(len(s) for s in msa_class.sequences)
     func = lambda x, r: (x[0] ** 2 * r * x[1] ** 2)
     return str(datetime.timedelta(seconds=int(func((l, n), 9.14726052e-06))))
 
@@ -97,7 +97,7 @@ def scatter3D(coordinates_dict):
 
 
 def write_feature_as_tsv(
-    feature_data: np.ndarray, keys: typing.List[str], file_name: typing.Union[Path, str]
+        feature_data: np.ndarray, keys: typing.List[str], file_name: typing.Union[Path, str]
 ):
     with open(file_name, "w") as f:
         for i in range(feature_data.shape[0]):
@@ -240,10 +240,10 @@ class PdbEntry:
 
 class PfamToPDB:
     def __init__(
-        self,
-        uri="https://www.rcsb.org/pdb/rest/hmmer?file=hmmer_pdb_all.txt",
-        from_file=False,
-        limit=None,
+            self,
+            uri="https://www.rcsb.org/pdb/rest/hmmer?file=hmmer_pdb_all.txt",
+            from_file=False,
+            limit=None,
     ):
         self.uri = uri
         if from_file:
@@ -286,7 +286,7 @@ class PfamToPDB:
             self.pfam_to_pdb_ids = new
 
     def get_entries_for_pfam(
-        self, pfam_id, limit_by_score=1.0, limit_by_protein_number=50
+            self, pfam_id, limit_by_score=1.0, limit_by_protein_number=50
     ):
         pdb_entries = list(
             filter(lambda x: (x.eValue < limit_by_score), self.pfam_to_pdb_ids[pfam_id])
