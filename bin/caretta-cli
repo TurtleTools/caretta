@@ -36,9 +36,6 @@ def align(
         input_pdb: Path = typer.Argument(
             ..., help="A folder with input protein files", callback=input_folder_callback
         ),
-        model_folder: Path = typer.Argument(
-            default=Path.cwd(), help="The folder containing the Geometricus ShapemerLearn model file",
-        ),
         gap_open_penalty: float = typer.Option(
             1.0, "-p", help="gap open penalty", callback=positive_penalty
         ),
@@ -110,7 +107,6 @@ def align(
     multiple_alignment.trigger_numba_compilation()
     multiple_alignment.align_from_structure_files(
         input_files=input_pdb,
-        model_folder=model_folder,
         gap_open_penalty=gap_open_penalty,
         gap_extend_penalty=gap_extend_penalty,
         consensus_weight=consensus_weight,

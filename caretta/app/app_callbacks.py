@@ -123,7 +123,6 @@ def register_callbacks(app, get_pdb_entries, suite):
                     continue
             msa_class, output_files = multiple_alignment.align_from_structure_files(
                 pdb_files,
-                model_folder="static/model",
                 output_folder=f"static/results_{app_helper.decompress_object(unique_id, suite)}",
                 gap_open_penalty=gap_open_dropdown,
                 gap_extend_penalty=gap_extend_dropdown,

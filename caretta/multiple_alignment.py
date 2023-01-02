@@ -398,7 +398,6 @@ def make_count_matrix(residues_list, alphabet_size: int):
 
 def align_from_structure_files(
         input_files: typing.Union[typing.List[str], Path, str],
-        model_folder: typing.Union[typing.List[str], Path, str] = Path.cwd(),
         gap_open_penalty: float = 1.0,
         gap_extend_penalty: float = 0.01,
         consensus_weight: bool = True,
@@ -427,8 +426,6 @@ def align_from_structure_files(
             A folder with input structure files,
             A file which lists structure filenames or "structure_filename, chain" on each line,
             A file which lists PDBIDs or PDBID_chain or PDBID, chain on each line
-        model_folder
-            Folder with the Geometricus ShapemerLearn model file
         gap_open_penalty
             default 1
         gap_extend_penalty
@@ -479,7 +476,7 @@ def align_from_structure_files(
     pdb_files = helper.parse_protein_files_and_clean(input_files, output_files.cleaned_pdb_folder)
     if verbose:
         typer.echo(f"Found {len(pdb_files)} structure files")
-    model = ShapemerLearn.load(Path(model_folder))
+    model = ShapemerLearn.load()
     protein_moments, errors = moment_invariants.get_invariants_for_structures(pdb_files,
                                                                               n_threads=num_threads,
                                                                               verbose=verbose)

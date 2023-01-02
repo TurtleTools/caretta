@@ -51,9 +51,6 @@ pip install git+https://github.com/TurtleTools/caretta.git
 pip install "caretta[GUI] @ git+https://github.com/TurtleTools/caretta.git"
 ```
 
-Download the `ShapemerLearn_RADIUS-5_RADIUS-10_KMER-8_KMER-16_68_32_10.pt`.
-The folder that this file is in needs to be specified to `caretta-cli`
-
 ### Environment variables:
 
 ```bash
@@ -66,7 +63,7 @@ export NUMBA_NUM_THREADS=20 # change to required number of threads
 ### Command-line Usage
 
 ```bash
-caretta-cli input_pdb_folder <model_file_folder> 
+caretta-cli input_pdb_folder
 # e.g. caretta-cli test_data  
 ```
 
@@ -84,8 +81,6 @@ Usage: caretta-cli [OPTIONS] INPUT_PDB [MODEL_FOLDER]
 
 Arguments:
   INPUT_PDB       A folder with input protein files  [required]
-  [MODEL_FOLDER]  The folder containing the Geometricus ShapemerLearn model
-                  file  [default: current directory]
 
 Options:
   -p FLOAT                        gap open penalty  [default: 1.0]
