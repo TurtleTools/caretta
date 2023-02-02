@@ -853,7 +853,7 @@ def write_superposed_pdbs_references(cleaned_pdb_folder, alignment, output_pdb_f
 
 
 def get_aligned_features(
-        alignment, cleaned_pdb_folder, dssp_dir, num_threads, only_dssp: bool = True
+        alignment, cleaned_pdb_folder, dssp_dir, num_threads, only_dssp: bool = True, gap=-1
 ) -> typing.Tuple[typing.List[str], typing.Dict[str, ndarray]]:
     """
     Get list of protein names and corresponding dict of aligned features
@@ -887,7 +887,7 @@ def get_aligned_features(
             indices = [
                 i
                 for i in range(alignment_length)
-                if alignment[names[p]][i] != "-"
+                if alignment[names[p]][i] != gap
             ]
             aligned_features[feature_name][p, indices] = farray
     return names, aligned_features
