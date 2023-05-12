@@ -1,0 +1,127 @@
+#!/opt/anaconda3/envs/config_preprocess/bin/python
+import warnings
+
+warnings.filterwarnings("ignore")
+
+from caretta import multiple_alignment
+from pathlib import Path
+import typer
+import numba as nb
+
+app = typer.Typer()
+
+
+def input_folder_callback(folder: Path) -> Path:
+    if not folder.exists():
+        raise typer.BadParameter(f"Folder {folder} does not exist")
+    return folder
+
+
+def output_folder_callback(folder: Path) -> Path:
+    if folder.exists():
+        raise typer.BadParameter(
+            f"Folder {folder} already exists, cowardly refusing to overwrite. Please delete it and try again"
+        )
+    return folder
+
+
+def positive_penalty(value: float) -> float:
+    if value < 0.0:
+        raise typer.BadParameter(f"Value {value} must be positive")
+    return value
+
+
+@app.command()
+def align(
+        input_pdb: Path = typer.Argument(
+            ..., help="A folder with input protein files", callback=input_folder_callback
+        ),
+        gap_open_penalty: float = typer.Option(
+            1.0, "-p", help="gap open penalty", callback=positive_penalty
+        ),
+        gap_extend_penalty: float = typer.Option(
+            0.01, "-e", help="gap extend penalty", callback=positive_penalty
+        ),
+        consensus_weight: bool = typer.Option(
+            True,
+            "--consensus-weight",
+            "-c",
+            help="weight well-aligned segments to reduce gaps in these areas",
+        ),
+        full: bool = typer.Option(
+            False,
+            "--full",
+            "-f",
+            help="Use all vs. all pairwise alignment for distance matrix calculation (much slower)",
+        ),
+        output: Path = typer.Option(
+            Path("caretta_results"),
+            "--output",
+            "-o",
+            help="folder to store output files",
+            callback=output_folder_callback,
+        ),
+        fasta: bool = typer.Option(True, help="write alignment in FASTA file format"),
+        pdb: bool = typer.Option(
+            True, help="write PDB files superposed according to alignment"
+        ),
+        threads: int = typer.Option(
+            4, "--threads", "-t", help="number of threads to use"
+        ),
+        features: bool = typer.Option(
+            False,
+            "--features",
+            help="extract and write aligned features as a dictionary of NumPy arrays into a pickle file",
+        ),
+        only_dssp: bool = typer.Option(
+            False,
+            "--only-dssp",
+            help="extract only DSSP features"
+        ),
+        write_class: bool = typer.Option(
+            False,
+            "--class",
+            help="write StructureMultiple class with intermediate structures and tree to pickle file",
+        ),
+        matrix: bool = typer.Option(
+            False,
+            "--matrix",
+            help="write pre-aligned distance matrix and post-aligned RMSD, coverage and TM-score matrices to files"
+        ),
+        verbose: bool = typer.Option(
+            True,
+            "--verbose", "-v",
+            help="Control verbosity",
+        ),
+):
+    """
+    Align protein structures using Caretta.
+
+    Writes the resulting sequence alignment and superposed PDB files to "caretta_results".
+    Optionally also outputs a set of aligned feature matrices, or the python class with intermediate structures
+    made during progressive alignment.
+    """
+    input_pdb = input_folder_callback(input_pdb)
+    output = output_folder_callback(output)
+    nb.set_num_threads(threads)
+    multiple_alignment.trigger_numba_compilation()
+    multiple_alignment.align_from_structure_files(
+        input_files=input_pdb,
+        gap_open_penalty=gap_open_penalty,
+        gap_extend_penalty=gap_extend_penalty,
+        consensus_weight=consensus_weight,
+        full=full,
+        output_folder=output,
+        num_threads=threads,
+        write_fasta=fasta,
+        write_pdb=pdb,
+        write_features=features,
+        only_dssp=only_dssp,
+        write_class=write_class,
+        write_matrix=matrix,
+        verbose=verbose
+    )
+
+
+if __name__ == "__main__":
+    app()

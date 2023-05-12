@@ -154,7 +154,7 @@ class MultipleAlignment:
     final_sequences: typing.Optional[typing.List[SequenceBase]] = None
     final_consensus_weights: typing.Optional[typing.List[np.ndarray]] = None
     final_alignments: typing.Optional[typing.Dict[str, typing.Dict[str, np.ndarray]]] = None
-    align_cofactors: bool = False
+    align_cofactors: typing.Bool = False
 
     def make_pairwise_matrix(self, score_function_params=None):
         if score_function_params is None:

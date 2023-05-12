@@ -1,0 +1,72 @@
+#!/opt/anaconda3/envs/config_preprocess/bin/python
+
+from pathlib import Path
+
+import dash
+import typer
+from cryptography.fernet import Fernet
+
+from caretta import helper, multiple_alignment
+from caretta.app import app_helper, app_layout, app_callbacks
+from geometricus.protein_utility import get_structure_files
+
+# for compressing and decompressing files
+KEY = Fernet.generate_key()
+SUITE = Fernet(KEY)
+
+STATIC = Path("static")
+if not STATIC.exists():
+    STATIC.mkdir()
+
+external_stylesheets = [
+    "https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css"
+]
+
+# server = Flask(__name__)
+app = dash.Dash(
+    __name__,
+    external_stylesheets=external_stylesheets,
+    url_base_pathname="/",
+)
+
+introduction_text = """Caretta generates multiple structure alignments for a set of input proteins and displays the alignment, the superposed proteins,
+and aligned structural features. All the generated data can further be exported for downstream use. 
+If you have to align more than 100 proteins your browser may lag, please use the command-line tool instead 
+(See https://git.wageningenur.nl/durai001/caretta for instructions)."""
+
+input_text = "Enter a folder with PDB files and click on Load Structures"
+placeholder_text = "PDB folder"
+selection_text = """Possible input options are: 
+* Path to a folder containing files
+* List of files (one on each line)
+* List of PDB IDs 
+"""
+
+app.layout = app_layout.get_layout(
+    introduction_text, input_text, placeholder_text, selection_text, SUITE
+)
+
+
+def get_pdb_entries_from_folder(folder):
+    return [
+        app_helper.PdbEntry.from_user_input(f) for f in get_structure_files(folder)
+    ]
+
+
+app_callbacks.register_callbacks(app, get_pdb_entries_from_folder, SUITE)
+
+
+def run(
+        host: str = typer.Argument("0.0.0.0", help="host IP to serve the app"),
+        port: int = typer.Argument(8888, help="port"),
+):
+    """
+    caretta-app is the GUI of caretta, capable of aligning and visualising multiple protein structures
+    and allowing extraction of aligned features such as bond angles, residue depths and fluctuations.
+    """
+    multiple_alignment.trigger_numba_compilation()
+    app.run_server(host=host, port=port)
+
+
+if __name__ == "__main__":
+    typer.run(run)
