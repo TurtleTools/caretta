@@ -48,11 +48,11 @@ def align(
             "-c",
             help="weight well-aligned segments to reduce gaps in these areas",
         ),
-        full: bool = typer.Option(
+        fast: bool = typer.Option(
             False,
-            "--full",
+            "--fast",
             "-f",
-            help="Use all vs. all pairwise alignment for distance matrix calculation (much slower)",
+            help="Don't use all vs. all pairwise alignment for distance matrix calculation",
         ),
         output: Path = typer.Option(
             Path("caretta_results"),
@@ -110,7 +110,7 @@ def align(
         gap_open_penalty=gap_open_penalty,
         gap_extend_penalty=gap_extend_penalty,
         consensus_weight=consensus_weight,
-        full=full,
+        full=not fast,
         output_folder=output,
         num_threads=threads,
         write_fasta=fasta,
