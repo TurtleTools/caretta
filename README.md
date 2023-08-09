@@ -89,8 +89,8 @@ Options:
   -e FLOAT                        gap extend penalty  [default: 0.01]
   -c, --consensus-weight          weight well-aligned segments to reduce gaps
                                   in these areas  [default: True]
-  -f, --full                      Use all vs. all pairwise alignment for
-                                  distance matrix calculation (much slower)
+  -f, --fast                      Don't use all vs. all pairwise alignment for
+                                  distance matrix calculation
   -o, --output PATH               folder to store output files  [default:
                                   caretta_results]
   --fasta / --no-fasta            write alignment in FASTA file format
